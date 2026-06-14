@@ -12,7 +12,6 @@ fi
 
 IMAGE_NAME="unity-vllm-bench"
 ARTIFACTS_DIR="$(pwd)/unity_artifacts"
-COVERAGE_DIR="/app/artifacts/coverage"
 
 echo "🚀 [1/4] Criando diretório de artefatos..."
 mkdir -p "$ARTIFACTS_DIR"
@@ -23,110 +22,42 @@ if [ $? -ne 0 ]; then echo "❌ Erro no build."; exit 1; fi
 
 # Detecção Automática de GPU
 GPU_FLAG=""
+HAS_GPU="false"
+
 if command -v nvidia-smi &> /dev/null && nvidia-smi &> /dev/null; then
     echo "🟢 GPU NVIDIA detectada! Ativando aceleração por hardware."
     GPU_FLAG="--gpus all"
+    HAS_GPU="true"
+    VLLM_FLAG=""
 else
     echo "🟡 Nenhuma GPU detectada. Rodando em modo CLI Puro (CPU)."
     GPU_FLAG=""
+    HAS_GPU="false"
+    VLLM_FLAG="--env VLLM_TARGET_DEVICE=cpu"
 fi
 
 USER_UID=$(id -u)
 USER_GID=$(id -g)
 
-echo "🎮 [3/4] Executando Pipeline CLI Customizado com Cobertura Separada..."
+echo "🎮  Executando Pipeline via Script Interno Isolado..."
 docker run --rm \
   $GPU_FLAG \
+  $VLLM_FLAG \
+  --entrypoint /bin/bash \
   --shm-size=4gb \
-  --entrypoint bash \
   -v "$PROJECT_PATH":/app/project \
   -v "$ARTIFACTS_DIR":/app/artifacts \
   --env UNITY_SERIAL \
   --env UNITY_EMAIL \
   --env UNITY_PASSWORD \
+  --env UNITY_ASM_NAME \
+  --env UNITY_LLM_API_KEY \
+  --env SCRIPT_PATH \
   --env USER_UID \
-  --env USER_UID \
+  --env USER_GID \
+  --env HF_TOKEN \
+  --env PLAYTEST_FOLDER \
+  --env EDITORTEST_FOLDER \
+  --env HAS_GPU="$HAS_GPU" \
   $IMAGE_NAME \
-  -c "
-    echo '=================================================='
-    echo '📊 VERIFICAÇÃO DE LIMITES DE MEMÓRIA (CONTAINER)'
-    echo '=================================================='
-    echo -n ' -> Memória Máxima do Container (Cgroups): '
-    [ -f /sys/fs/cgroup/memory.max ] && cat /sys/fs/cgroup/memory.max || echo 'Ilimitada'
-    echo '=================================================='
-
-    # Configurações de Sanidade do OS
-    mkdir -p /var/lib/dbus /etc
-    echo \$(head -c 16 /dev/urandom | xxd -p) > /etc/machine-id
-    cp /etc/machine-id /var/lib/dbus/machine-id
-
-    # Inicialização do Monitor de Recursos
-    REPORT_FILE=\"/app/artifacts/performance_report.log\"
-    (while true; do
-        echo \"--- [\$(date '+%Y-%m-%d %H:%M:%S')] ---\" >> \"\$REPORT_FILE\"
-        echo \"[RAM livre/usada em MB]:\" >> \"\$REPORT_FILE\"
-        free -m | grep -E 'Mem|Total' >> \"\$REPORT_FILE\"
-        sleep 2
-    done) &
-    MONITOR_PID=\$!
-
-    # --------------------------------------------------
-    # PIPELINE DE EXECUÇÃO - VALIDAÇÃO E GERAÇÃO
-    # --------------------------------------------------
-    echo '🔑 Ativando licença Unity...'
-    /opt/Unity/Unity -batchmode -nographics -serial \"\$UNITY_SERIAL\" -username \"\$UNITY_EMAIL\" -password \"\$UNITY_PASSWORD\" -logFile /app/artifacts/activation-log.txt
-
-    # echo '🛠️  [MÉTODO] Gerando Testes via CLI...'
-    /opt/Unity/Unity -projectPath /app/project -batchmode -nographics \
-      -executeMethod LaundryNDishes.CLI.LndCommandLineInterface.GenerateTestsFolder \
-      -folder \"Assets/Scripts\" -csv \"/app/artifacts/testGeneration.csv\" \
-      -logFile /app/artifacts/generation-cli-log.txt
-
-    echo '🎮 PASSO 1: Rodando EditMode Tests + Coverage...'
-    # Usando subpastas para não misturar os relatórios brutos antes da unificação
-    mkdir -p $COVERAGE_DIR/editmode
-    /opt/Unity/Unity -projectPath /app/project -batchmode -nographics \
-      -testPlatform editmode -runTests -debugCodeOptimization -enableCodeCoverage \
-      -coverageResultsPath $COVERAGE_DIR/editmode \
-      -coverageOptions \"generateAdditionalMetrics;assemblyFilters:+Assembly-CSharp\" \
-      -testResults /app/artifacts/editmode-results.xml \
-      -logFile /app/artifacts/editmode-log.txt
-
-    echo '🎮 PASSO 2: Rodando PlayMode Tests + Coverage...'
-    mkdir -p $COVERAGE_DIR/playmode
-    /opt/Unity/Unity -projectPath /app/project -batchmode -nographics \
-      -testPlatform playmode -runTests -debugCodeOptimization -enableCodeCoverage \
-      -coverageResultsPath $COVERAGE_DIR/playmode \
-      -coverageOptions \"generateAdditionalMetrics;assemblyFilters:+Assembly-CSharp\" \
-      -testResults /app/artifacts/playmode-results.xml \
-      -logFile /app/artifacts/playmode-log.txt
-
-    echo '📊 PASSO 3: Gerando Relatório Cobertura HTML Final (PlayMode + EditMode combinados)...'
-    /opt/Unity/Unity -projectPath /app/project -batchmode -nographics \
-      -debugCodeOptimization -enableCodeCoverage \
-      -coverageResultsPath $COVERAGE_DIR \
-      -coverageOptions \"generateHtmlReport;generateBadgeReport;assemblyFilters:+Assembly-CSharp\" \
-      -quit \
-      -logFile /app/artifacts/coverage-report-log.txt
-
-    echo '📝 [MÉTODO] Exportando Relatório de Lista de Testes Final...'
-    /opt/Unity/Unity -projectPath /app/project -batchmode -nographics \
-      -executeMethod LaundryNDishes.CLI.LndCommandLineInterface.ExportTestReport \
-      -csv \"/app/artifacts/testList.csv\" \
-      -logFile /app/artifacts/export-cli-log.txt
-
-    echo '🔓 Devolvendo licença Unity...'
-    /opt/Unity/Unity  -quit  -batchmode -nographics -returnlicense \"\$UNITY_SERIAL\" -username \"\$UNITY_EMAIL\" -password \"\$UNITY_PASSWORD\"  -logFile /app/artifacts/return-log.txt
-
-    # Encerramento do Monitor
-    kill \$MONITOR_PID
-    
-    # --------------------------------------------------
-    # CORREÇÃO DE PERMISSÕES DENTRO DO CONTAINER
-    # --------------------------------------------------
-    echo '🔐 Ajustando permissões dos artefatos e do projeto para o usuário local...'
-    chown -R $USER_UID:$USER_GID /app/artifacts
-    chown -R $USER_UID:$USER_GID /app/project
-    echo '📊 [4/4] Processando e unificando dados em report.txt...'
-    python3 /app/parse_results.py /app/artifacts
-  " 2>&1 | tee "$ARTIFACTS_DIR/pipeline_execution.log"
+  /app/pipeline.sh 2>&1 | tee "$ARTIFACTS_DIR/pipeline_execution.log"

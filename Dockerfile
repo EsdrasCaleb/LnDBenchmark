@@ -3,8 +3,9 @@ FROM vllm/vllm-openai:latest
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 2. Instala dependências da Unity, do Monitor e do Chromium (CEF)
+# 2. Instala dependências da Unity, do Monitor, do Chromium (CEF) e Git para o UPM
 RUN apt-get update && apt-get install -y \
+    git \
     curl \
     wget \
     p7zip-full \
@@ -23,7 +24,6 @@ RUN apt-get update && apt-get install -y \
     libxtst6 \
     libxshmfence1 \
     libgbm1 \
-    # --- NOVAS DEPENDÊNCIAS CRUCIAIS (Evitam o Trace/breakpoint trap) ---
     libxcomposite1 \
     libxcursor1 \
     libxdamage1 \
@@ -34,6 +34,8 @@ RUN apt-get update && apt-get install -y \
     libxkbcommon-x11-0 \
     libsecret-1-0 \
     && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install huggingface_hub pandas requests
 
 # 3. Instalação da Unity utilizando o Changeset correto (b58023a2b463)
 RUN mkdir -p /tmp/unity-download \
@@ -48,4 +50,6 @@ ENV HF_HOME="/tmp/huggingface"
 WORKDIR /app
 
 # 4. Puxa o script de análise para dentro do container
-COPY parse_results.py /app/parse_results.py
+COPY in_container/orchestrator.py /app/orchestrator.py
+COPY in_container/pipeline.sh /app/pipeline.sh
+RUN chmod +x /app/pipeline.sh
