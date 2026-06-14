@@ -218,3 +218,4 @@ __marimo__/
 .streamlit/secrets.toml
 
 unity_artifacts/*
+npad_artifacts/*

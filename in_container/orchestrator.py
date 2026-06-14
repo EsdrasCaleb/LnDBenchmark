@@ -450,8 +450,13 @@ def main():
     models_to_test = get_best_code_models(limit=5, completed_models=completed_models)
     
     if not models_to_test:
-        print("❌ Nenhum modelo compatível encontrado nos critérios especificados.")
-        return
+        print("🏁 [CONCLUÍDO] Nenhum modelo restante para processar na lista do Hugging Face!")
+        # Cria um arquivo de texto indicando fim absoluto fora do container
+        flag_path = os.path.join(artifacts_dir, "NO_MORE_MODELS.flag")
+        with open(flag_path, "w") as f:
+            f.write("FINISHED")
+        sys.exit(0) # Sai com sucesso
+    
 
     for model in models_to_test:
         # PONTO DE CHECAGEM: Se o modelo já foi processado com sucesso no passado, pula!
