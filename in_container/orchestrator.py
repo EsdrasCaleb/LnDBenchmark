@@ -182,7 +182,6 @@ def run_vllm(model_name):
         "--model", model_name,
         "--port", "11434",
         "--max-model-len", "2048",
-        "--disable-log-requests",
         "--served-model-name", "vllm-model"
     ]
     

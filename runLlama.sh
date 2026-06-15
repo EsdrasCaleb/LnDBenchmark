@@ -10,7 +10,7 @@ else
     exit 1
 fi
 
-IMAGE_NAME="unity-llama-bench"
+IMAGE_NAME="unity-vllm-bench"
 ARTIFACTS_DIR="$(pwd)/unity_artifacts"
 
 echo "🚀 [1/4] Criando diretório de artefatos..."
@@ -18,7 +18,7 @@ mkdir -p "$ARTIFACTS_DIR"
 
 echo "📦 [2/4] Construindo imagem Docker a partir do DockerfileLlamma..."
 # 🌟 Alterado: -f DockerfileLlamma aponta explicitamente para o seu arquivo customizado
-docker build -f DockerfileLlamma -t $IMAGE_NAME .
+docker build  -t $IMAGE_NAME .
 if [ $? -ne 0 ]; then echo "❌ Erro no build."; exit 1; fi
 
 # Detecção Automática de GPU
@@ -58,4 +58,4 @@ docker run --rm \
   --env EDITORTEST_FOLDER \
   --env HAS_GPU="$HAS_GPU" \
   $IMAGE_NAME \
-  /app/pipeline.sh 2>&1 | tee "$ARTIFACTS_DIR/pipeline_execution.log"
+  /app/pipelineLlama.sh 2>&1 | tee "$ARTIFACTS_DIR/pipeline_execution.log"
