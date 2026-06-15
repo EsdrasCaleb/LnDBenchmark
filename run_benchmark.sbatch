@@ -67,12 +67,13 @@ fi
 echo "========================================================="
 echo "🎮 Executando Container Llama.cpp + Unity com Suporte a GPU"
 echo "========================================================="
-
+touch /tmp/fake_machine_id
 # 💡 VEJA COMO FICOU LIMPO: Não precisa de nenhuma flag --env aqui! 
 # O Singularity coleta tudo que começa com SINGULARITYENV_ sozinho.
 singularity exec --nv \
   --bind "$PROJECT_PATH":/app/project \
   --bind "$ARTIFACTS_DIR":/app/artifacts \
-  "$SCRATCH_DIR/unity-vllm-bench.sif" /app/pipeline.sh
+  --bind /tmp/fake_machine_id:/etc/machine-id \
+  "$SCRATCH_DIR/unity-vllm-bench.sif" /app/pipelineLlama.sh
 
 echo "✅ Bloco de execução finalizado com sucesso!"
