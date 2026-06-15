@@ -76,8 +76,9 @@ singularity exec --nv --writable-tmpfs \
             echo '👉 Abra o arquivo npad_artifacts/vllm_server.log para ver o culpado.'
             exit 1
         fi
-        
+        echo 'sleeping'
         sleep 4
+        echo 'try again'
     done
     
     echo '✅ Servidor vLLM está ONLINE e pronto!'
