@@ -3,8 +3,14 @@ FROM vllm/vllm-openai:latest
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 2. Instala dependências da Unity, do Monitor, do Chromium (CEF) e Git para o UPM
+# Configura caminhos globais de compilação CUDA caso o compilador seja exigido
+ENV PATH="/usr/local/cuda/bin:${PATH}"
+ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
+
+# 2. Instala dependências da Unity, do Monitor, do Chromium (CEF), Git e ferramentas para compilar o Llama.cpp
 RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
     git \
     curl \
     wget \
@@ -35,7 +41,12 @@ RUN apt-get update && apt-get install -y \
     libsecret-1-0 \
     && rm -rf /var/lib/apt/lists/*
 
+# Instala bibliotecas auxiliares do Python
 RUN pip3 install huggingface_hub pandas requests
+
+# 🔥 2b. Instalação e Compilação do Llama.cpp com suporte a GPU/CPU integrado
+ENV GGML_CUDA=on
+RUN pip3 install --no-cache-dir llama-cpp-python[server]
 
 # 3. Instalação da Unity utilizando o Changeset correto (b58023a2b463)
 RUN mkdir -p /tmp/unity-download \
@@ -49,7 +60,7 @@ ENV HF_HOME="/tmp/huggingface"
 
 WORKDIR /app
 
-# 4. Puxa o script de análise para dentro do container
+# 4. Puxa os scripts de análise para dentro do container
 COPY in_container/orchestrator.py /app/orchestrator.py
 COPY in_container/parse_results.py /app/parse_results.py
 COPY in_container/pipeline.sh /app/pipeline.sh
