@@ -10,12 +10,12 @@
 #SBATCH --mem=32G          
 #SBATCH --gres=gpu:1            
 
-ARTIFACTS_DIR="$HOME/unity_artifacts"
+ARTIFACTS_DIR="unity_artifacts"
 SCRATCH_DIR="$HOME/scratch"
 
 # 1. CARREGAMENTO INTELIGENTE DO .ENV
 # Lemos linha por linha para evitar quebras por causa de espaços ou aspas
-if [ -f "$HOME/.env" ]; then
+if [ -f ".env" ]; then
     echo "📋 Carregando e exportando variáveis do .env para o Singularity..."
     while IFS= read -r line || [ -n "$line" ]; do
         # Ignora linhas vazias e comentários
