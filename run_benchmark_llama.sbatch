@@ -72,7 +72,8 @@ echo "========================================================="
 singularity exec --nv --writable-tmpfs \
   --bind "$PROJECT_PATH":/app/project \
   --bind "$ARTIFACTS_DIR":/app/artifacts \
-  --bind ./in_container/pipeline.sh:/app/pipeline.sh \
+  --bind ./in_container/pipelineLlama.sh:/app/pipelineLlama.sh \
+  --bind ./in_container/orchestratorLlama.py:/app/orchestratorLlama.py \
   "$SCRATCH_DIR/unity-vllm-bench.sif" /app/pipelineLlama.sh
 
 echo "✅ Bloco de execução finalizado com sucesso!"

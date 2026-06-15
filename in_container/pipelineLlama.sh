@@ -13,11 +13,6 @@ echo -n ' -> Memória Máxima do Container (Cgroups): '
 [ -f /sys/fs/cgroup/memory.max ] && cat /sys/fs/cgroup/memory.max || echo 'Ilimitada'
 echo '=================================================='
 
-# Configurações de Sanidade do OS
-# mkdir -p /var/lib/dbus /etc
-# echo $(head -c 16 /dev/urandom | xxd -p) > /etc/machine-id
-# cp /etc/machine-id /var/lib/dbus/machine-id
-
 # Garante um estado inicial para o arquivo do modelo
 echo "-" > "$TMP_MODEL_FILE"
 
