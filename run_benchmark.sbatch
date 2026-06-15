@@ -31,7 +31,7 @@ if [ -f ".env" ]; then
         
         # A MÁGICA: Exporta com o prefixo que o Singularity injeta AUTOMATICAMENTE no container
         export "SINGULARITYENV_$key"="$val"
-    done < "$HOME/.env"
+    done < ".env"
 else
     echo "❌ Erro: Arquivo .env não encontrado em $HOME"
     exit 1
