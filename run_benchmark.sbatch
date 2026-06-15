@@ -41,7 +41,7 @@ fi
 export SINGULARITYENV_HAS_GPU="true"
 
 # 2. Carrega os módulos do NPAD
-module load softwares/singularity
+module load singularity
 module load softwares/squashfs
 module load compilers/nvidia/cuda/12.6
 
