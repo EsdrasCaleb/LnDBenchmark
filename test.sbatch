@@ -35,6 +35,7 @@ fi
 export SINGULARITYENV_HF_HOME="/tmp/huggingface"
 
 # 2. Carrega os módulos
+module load cuda || module load drivers/cuda || true
 module load singularity || module load softwares/singularity || true
 
 echo "========================================================="
@@ -55,6 +56,7 @@ singularity exec --nv --writable-tmpfs \
     python3 -m vllm.entrypoints.openai.api_server \
         --model google/gemma-3-1b-it \
         --port $PORTA_TESTE \
+        --served-model-name vllm-model \
         --trust-remote-code > /app/artifacts/vllm_server.log 2>&1 &
     VLLM_PID=\$!
 
@@ -87,7 +89,7 @@ singularity exec --nv --writable-tmpfs \
     curl -s -X POST http://localhost:$PORTA_TESTE/v1/chat/completions \
       -H 'Content-Type: application/json' \
       -d '{
-        \"model\": \"google/gemma-3-1b-it\",
+        \"model\": \"vllm-model\",
         \"messages\": [
           {\"role\": \"user\", \"content\": \"Olá! Teste de infraestrutura do supercomputador via HTTP API. Você está funcionando na GPU?\"}
         ],
