@@ -74,6 +74,6 @@ singularity exec --nv \
   --bind "$PROJECT_PATH":/app/project \
   --bind "$ARTIFACTS_DIR":/app/artifacts \
   --bind /tmp/fake_machine_id:/etc/machine-id \
-  "$SCRATCH_DIR/unity-vllm-bench.sif" /app/pipelineLlama.sh
+  "$SCRATCH_DIR/unity-vllm-bench.sif" /app/pipeline.sh
 
 echo "✅ Bloco de execução finalizado com sucesso!"
