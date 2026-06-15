@@ -129,4 +129,6 @@ docker run --rm \
     echo '🔐 Ajustando permissões dos artefatos e do projeto para o usuário local...'
     chown -R $USER_UID:$USER_GID /app/artifacts
     chown -R $USER_UID:$USER_GID /app/project
+    echo '📊 [4/4] Processando e unificando dados em report.txt...'
+    python3 /app/parse_results.py /app/artifacts
   " 2>&1 | tee "$ARTIFACTS_DIR/pipeline_execution.log"

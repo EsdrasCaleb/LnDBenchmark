@@ -1,10 +1,19 @@
-# 1. Base robusta com CUDA e vLLM já configurados
-FROM vllm/vllm-openai:latest
+# 1. Base oficial da NVIDIA com ferramentas de desenvolvimento (Devel) 
+# Necessária para compilar o llama.cpp com suporte a placas de vídeo
+FROM nvidia/cuda:12.6.0-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 2. Instala dependências da Unity, do Monitor, do Chromium (CEF) e Git para o UPM
+# Configura os caminhos do compilador CUDA
+ENV PATH="/usr/local/cuda/bin:${PATH}"
+ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
+
+# 2. Instala Python, ferramentas de compilação (Cmake/gcc) e dependências da Unity/Chromium
 RUN apt-get update && apt-get install -y \
+    python3-pip \
+    python3-dev \
+    build-essential \
+    cmake \
     git \
     curl \
     wget \
@@ -35,9 +44,13 @@ RUN apt-get update && apt-get install -y \
     libsecret-1-0 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install huggingface_hub pandas requests
+# 3. COMPILAÇÃO DO LLAMA.CPP COM SUPORTE A GPU (Híbrido)
+# A flag GGML_CUDA=on avisa o instalador para buildar com suporte a NVIDIA.
+# O pacote [server] instala a API compatível com o OpenAI (exatamente igual ao vLLM fazia)
+ENV GGML_CUDA=on
+RUN pip3 install --no-cache-dir llama-cpp-python[server] huggingface_hub pandas requests
 
-# 3. Instalação da Unity utilizando o Changeset correto (b58023a2b463)
+# 4. Instalação da Unity utilizando o Changeset correto
 RUN mkdir -p /tmp/unity-download \
     && curl -fSL -o /tmp/unity-download/unity.tar.xz https://download.unity3d.com/download_unity/3000ef702840/LinuxEditorInstaller/Unity-6000.3.11f1.tar.xz \
     && mkdir -p /opt/Unity \
@@ -49,8 +62,8 @@ ENV HF_HOME="/tmp/huggingface"
 
 WORKDIR /app
 
-# 4. Puxa o script de análise para dentro do container
-COPY in_container/orchestrator.py /app/orchestrator.py
+# 5. Puxa os seus scripts de análise para dentro do container
+COPY in_container/orchestratorLlama.py /app/orchestrator.py
 COPY in_container/parse_results.py /app/parse_results.py
 COPY in_container/pipeline.sh /app/pipeline.sh
 RUN chmod +x /app/pipeline.sh

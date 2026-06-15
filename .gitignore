@@ -219,3 +219,4 @@ __marimo__/
 
 unity_artifacts/*
 npad_artifacts/*
+*.sif
