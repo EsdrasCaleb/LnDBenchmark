@@ -1,13 +1,12 @@
-# 1. Cria uma pasta temporária no seu disco atual (onde tem espaço de sobra)
+#!/bin/bash
+set -e
+
 mkdir -p ./tmp_build
+export APPTAINER_TMPDIR="$PWD/tmp_build"
+export APPTAINER_CACHEDIR="$PWD/tmp_build"
 
-# 2. Aponta os caches e os diretórios temporários para essa nova pasta
-export APPTAINER_TMPDIR=$PWD/tmp_build
-export APPTAINER_CACHEDIR=$PWD/tmp_build
+echo "🚀 Construindo SIF direto pelo Apptainer (Adeus Docker, salvando o SSD)..."
+sudo -E apptainer build --force unity-vllm-bench.sif unity-vllm.def
 
-# Se você estiver usando o SingularityCE clássico (AUR), use estas variáveis em vez das de cima:
-export SINGULARITY_TMPDIR=$PWD/tmp_build
-export SINGULARITY_CACHEDIR=$PWD/tmp_build
-
-# 3. Agora sim, rode o build com o sudo preservando essas variáveis (-E)
-sudo -E apptainer build unity-vllm-bench.sif unity-vllm.def
+rm -rf ./tmp_build
+echo "✅ Concluído com sucesso!"
