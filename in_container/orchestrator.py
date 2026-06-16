@@ -449,63 +449,65 @@ def get_best_gguf_models(limit=5, completed_models=None):
     return filtered_models
 
 def run_llamacpp(local_model_path, identifier):
-    """Inicia o servidor Llama.cpp COMPLETAMENTE ABERTO (Sem travas de token/API Key)."""
+    """Inicia o servidor e aguarda o aquecimento real do modelo."""
     has_gpu = os.environ.get("HAS_GPU", "false").lower() == "true"
     
+    run_env = os.environ.copy()
+    run_env["LAMA_CPP_MODEL"] = local_model_path
+    run_env["LAMA_CPP_PORT"] = "11434"
+    run_env["LAMA_CPP_MODEL_ALIAS"] = "vllm-model" # ✅ Configuração via Env
+    run_env["LAMA_CPP_API_KEYS"] = ""             # ✅ API Key desativada via Env
+    run_env["LAMA_CPP_N_CTX"] = "2048"
+    run_env["LAMA_CPP_N_GPU_LAYERS"] = "-1" if has_gpu else "0"
+
+    # Comando simplificado (sem os argumentos --model-alias, etc)
     cmd = [
-        "python3", "-u", "-m", "llama_cpp.server",
-        "--model", local_model_path,
-        "--port", "11434",
-        "--n_ctx", "2048",
-        "--a", "vllm-model",
-        "--api_keys", ""  # 🔓 Força o Llama.cpp a desativar a checagem de API Key e aceitar strings vazias!
+        "python3", "-u", "-m", "llama_cpp.server"
     ]
-    
-    if has_gpu:
-        print(f"🚀 Subindo Llama.cpp para: {identifier} [Modo: GPU (Full Offload)]")
-        cmd += ["--n_gpu_layers", "-1"]
-    else:
-        print(f"🚀 Subindo Llama.cpp para: {identifier} [Modo: CPU Nativo]")
-        cmd += ["--n_gpu_layers", "0"]
     
     safe_name = identifier.replace('/', '_').replace('.', '_')
     log_file_path = f"/app/artifacts/llamacpp_{safe_name}_debug.log"
     log_file = open(log_file_path, "w")
     
-    process = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT)
-    start_time = time.time()
+    process = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, env=run_env)
     
-    while True:
+    # 🏁 AGUARDE O AQUECIMENTO
+    print(f"🚀 Subindo Llama.cpp para: {identifier}...")
+    
+    # Pequeno tempo fixo para subir o processo
+    time.sleep(10)
+    
+    # 🧠 TESTE DE AQUECIMENTO (Warmup)
+    # Enviamos uma requisição mínima de teste
+    warmup_url = "http://localhost:11434/v1/chat/completions"
+    payload = {
+        "model": "vllm-model",
+        "messages": [{"role": "user", "content": "hi"}]
+    }
+    
+    max_retries = 15
+    for i in range(max_retries):
         try:
-            # 📡 Teste público sem headers complexos, pois o servidor agora está aberto!
-            response = requests.get("http://localhost:11434/v1/models", timeout=2)
+            # Fazemos o request real. Se o modelo não estiver pronto, ele falha.
+            response = requests.post(warmup_url, json=payload, timeout=10)
             if response.status_code == 200:
-                print("🟢 Llama.cpp conectado publicamente e pronto para responder à Unity!")
-                log_file.close()
+                print("🟢 Modelo aquecido e respondendo corretamente!")
                 return process
-        except requests.RequestException:
-            pass
+            else:
+                print(f"⏳ Aguardando modelo... (Status atual: {response.status_code})")
+        except:
+            print(f"⏳ Servidor iniciando... ({i+1}/{max_retries})")
         
-        exit_code = process.poll()
-        if exit_code is not None:
-            log_file.flush()
-            log_file.close()
-            print(f"❌ Erro crítico: O backend do Llama.cpp crashou. Código de saída: {exit_code}")
-            os.system(f"tail -n 15 {log_file_path}")
-            return None
-            
-        if time.time() - start_time > 300:
-            print("❌ Timeout no carregamento do Llama.cpp.")
-            process.terminate()
-            log_file.close()
-            return None
-        time.sleep(5)
-
+        time.sleep(10) # Espera 10s entre tentativas
+        
+    process.terminate()
+    return None
 # =====================================================================
 # ⚙️ MÓDULO ORQUESTRADOR CENTRAL (MAIN)
 # =====================================================================
 
 def main():
+    print("DEBUG: Entrou no main do orquestrador.")
     parser = argparse.ArgumentParser(description="Orquestrador Unificado de IA para Testes de Cobertura Unity")
     parser.add_argument(
         "--backend", 
