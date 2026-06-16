@@ -40,7 +40,6 @@ From: vllm/vllm-openai:v0.6.3
 %files
     in_container/orchestrator.py /app/orchestrator.py
     in_container/parse_results.py /app/parse_results.py
-    in_container/orchestratorLlama.py /app/orchestratorLlama.py
     in_container/pipeline.sh /app/pipeline.sh
     in_container/pipelineLlama.sh /app/pipelineLlama.sh
 

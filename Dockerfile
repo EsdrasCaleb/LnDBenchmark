@@ -63,7 +63,6 @@ WORKDIR /app
 # 4. Puxa os scripts de análise para dentro do container
 COPY in_container/orchestrator.py /app/orchestrator.py
 COPY in_container/parse_results.py /app/parse_results.py
-COPY in_container/orchestratorLlama.py /app/orchestratorLlama.py
 COPY in_container/pipeline.sh /app/pipeline.sh
 COPY in_container/pipelineLlama.sh /app/pipelineLlama.sh
 RUN chmod +x /app/pipeline.sh

@@ -92,4 +92,4 @@ echo '🔑 Ativando licença Unity global...'
 /opt/Unity/Unity -batchmode -nographics -serial "$UNITY_SERIAL" -username "$UNITY_EMAIL" -password "$UNITY_PASSWORD" -logFile /app/artifacts/activation-log.txt
 
 # Deixa o Orquestrador Python tomar conta de todo o benchmark dinâmico
-python3 /app/orchestratorLlama.py 
+python3 /app/orchestrator.py  --backend llamacpp
