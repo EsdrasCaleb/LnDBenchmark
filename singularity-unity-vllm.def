@@ -1,5 +1,5 @@
 Bootstrap: docker
-From: vllm/vllm-openai:v0.6.3
+From: pytorch/pytorch:2.4.0-cuda12.1-cudnn9-devel
 
 %environment
     export DEBIAN_FRONTEND=noninteractive
@@ -13,7 +13,7 @@ From: vllm/vllm-openai:v0.6.3
     # 1. Instala dependências do sistema
     apt-get update && apt-get install -y \
         build-essential cmake git curl wget p7zip-full unzip xvfb \
-        ca-certificates xxd libvulkan1 libgl1-mesa-glx libgl1-mesa-dri libglib2.0-0 \
+        ca-certificates xxd libgl1-mesa-glx libgl1-mesa-dri libglib2.0-0 \
         libgtk-3-0 libgconf-2-4 libnss3 libxss1 libasound2 libxtst6 \
         libxshmfence1 libgbm1 libxcomposite1 libxcursor1 libxdamage1 \
         libxrandr2 libxrender1 libxi6 libxkbcommon0 libxkbcommon-x11-0 \
@@ -28,8 +28,8 @@ From: vllm/vllm-openai:v0.6.3
     rm -rf /tmp/unity-download
 
     # 3. Instala pacotes Python + Biblioteca Python compilada para CUDA
-    pip3 install huggingface_hub pandas requests
-    
+    pip3 install --no-cache-dir huggingface_hub pandas requests psutil nvidia-ml-py llama-cpp-python
+
     # 🔥 3b. Baixa o binário oficial Vulkan e instala corretamente
     wget "https://github.com/ggml-org/llama.cpp/releases/download/b9673/llama-b9673-bin-ubuntu-vulkan-x64.tar.gz" -O llama.tar.gz
     mkdir -p /opt/llama
@@ -46,6 +46,7 @@ From: vllm/vllm-openai:v0.6.3
 %files
     in_container/orchestrator.py /app/orchestrator.py
     in_container/parse_results.py /app/parse_results.py
+    in_container/utils.py /app/utils.py
     in_container/pipeline.sh /app/pipeline.sh
     in_container/pipelineLlama.sh /app/pipelineLlama.sh
 

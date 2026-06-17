@@ -14,9 +14,6 @@ if [ -n "$1" ]; then
     if [ "$1" == "vllm" ] || [ "$1" == "llamacpp" ]; then
         BACKEND_ARG="--backend $1"
         echo "🎯 Backend selecionado via parâmetro: $1"
-    else
-        echo "❌ Erro: Backend '$1' inválido. Escolha entre 'vllm' ou 'llamacpp'."
-        exit 1
     fi
 else
     echo "💡 Nenhum backend especificado. O Orquestrador assumirá o padrão interno (vllm)."

@@ -1,14 +1,13 @@
-# 1. Base robusta com CUDA e vLLM já configurados
-FROM vllm/vllm-openai:v0.6.3
+# 1. Base robusta e oficial com CUDA e Python prontos (Muito mais leve que a do vLLM)
+FROM pytorch/pytorch:2.4.0-cuda12.1-cudnn9-devel
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Configura caminhos globais de compilação CUDA caso o compilador seja exigido
+# Configura caminhos globais de execução e bibliotecas CUDA
 ENV PATH="/usr/local/cuda/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
 
-# 2. Instala dependências da Unity, do Monitor, do Chromium (CEF), Git e ferramentas para compilar o Llama.cpp
-# (Lista duplicada foi limpa)
+# 2. Instala dependências da Unity, do Monitor, do Chromium (CEF), Git e ferramentas de compilação
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
@@ -42,34 +41,36 @@ RUN apt-get update && apt-get install -y \
     libsecret-1-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Instalação da Unity utilizando o Changeset correto (b58023a2b463)
+# 3. Instalação da Unity utilizando o Changeset correto
 RUN mkdir -p /tmp/unity-download \
     && curl -fSL -o /tmp/unity-download/unity.tar.xz https://download.unity3d.com/download_unity/3000ef702840/LinuxEditorInstaller/Unity-6000.3.11f1.tar.xz \
     && mkdir -p /opt/Unity \
     && tar -xJf /tmp/unity-download/unity.tar.xz -C /opt/Unity --strip-components=1 \
     && rm -rf /tmp/unity-download
 
-# 🔥 2c. Baixa o binário oficial Vulkan e instala corretamente
-RUN wget "https://github.com/ggml-org/llama.cpp/releases/download/b9673/llama-b9673-bin-ubuntu-vulkan-x64.tar.gz" -O llama.tar.gz \
-    && mkdir -p /opt/llama \
-    && tar -xzf llama.tar.gz -C /opt/llama \
-    && find /opt/llama -type f -executable -exec cp {} /usr/local/bin/ \; \
-    && find /opt/llama -type f -name "*.so*" -exec cp {} /usr/local/lib/ \; \
-    && ldconfig \
-    && rm -rf llama.tar.gz /opt/llama
+# 🔥 4. COMPILAÇÃO NATIVA DO LLAMA.CPP COM SUPORTE CUDA (Infinita performance e estabilidade)
+RUN git clone https://github.com/ggml-org/llama.cpp.git /tmp/llama.cpp \
+    && cd /tmp/llama.cpp \
+    && mkdir build \
+    && cd build \
+    && cmake .. -GGML_CUDA=ON \
+    && cmake --build . --config Release --target llama-server \
+    && cp bin/llama-server /usr/local/bin/ \
+    && cd / \
+    && rm -rf /tmp/llama.cpp
 
-# Instala bibliotecas auxiliares do Python
-RUN pip3 install huggingface_hub pandas requests psutil nvidia-ml-py
+# 5. Instala bibliotecas do Python (Incluindo os novos monitores)
+RUN pip3 install --no-cache-dir huggingface_hub pandas requests psutil nvidia-ml-py llama-cpp-python
 
 ENV PATH="/opt/Unity:${PATH}"
 ENV HF_HOME="/tmp/huggingface"
 
 WORKDIR /app
 
-# 4. Puxa os scripts de análise para dentro do container
+# 6. Puxa os scripts de análise para dentro do container
 COPY in_container/orchestrator.py /app/orchestrator.py
 COPY in_container/parse_results.py /app/parse_results.py
+COPY in_container/utils.py /app/utils.py
 COPY in_container/pipeline.sh /app/pipeline.sh
-COPY in_container/pipelineLlama.sh /app/pipelineLlama.sh
-RUN chmod +x /app/pipeline.sh
-RUN chmod +x /app/pipelineLlama.sh
+
+RUN chmod +x /app/pipeline.sh \

@@ -3,73 +3,7 @@ import xml.etree.ElementTree as ET
 import os
 import sys
 import glob
-
-def parse_test_results(xml_path):
-    """Lê os resultados dos testes da Unity (Passou/Falhou)"""
-    if not os.path.exists(xml_path):
-        return {"status": "Não Encontrado", "passed": 0, "failed": 0, "total": 0}
-    try:
-        tree = ET.parse(xml_path)
-        root = tree.getroot()
-        return {
-            "status": "OK",
-            "total": int(root.get('total', 0)),
-            "passed": int(root.get('passed', 0)),
-            "failed": int(root.get('failed', 0)),
-            "duration": root.get('duration', '0')
-        }
-    except:
-        return {"status": "Erro de Leitura", "passed": 0, "failed": 0, "total": 0}
-
-def calculate_opencover_metrics(coverage_dir):
-    """
-    Varre os arquivos gerados pelo OpenCover da Unity para calcular 
-    as porcentagens exatas de Line Coverage e Method Coverage.
-    """
-    search_path = os.path.join(coverage_dir, "**", "*.xml")
-    xml_files = glob.glob(search_path, recursive=True)
-    
-    # Filtra para evitar pegar relatórios do ReportGenerator (HTML) se existirem
-    opencover_files = [f for f in xml_files if "CoverageReport" not in f]
-
-    total_sequence_points = 0
-    visited_sequence_points = 0
-    total_methods = 0
-    visited_methods = 0
-
-    for file in opencover_files:
-        try:
-            tree = ET.parse(file)
-            root = tree.getroot()
-            
-            # Percorre todos os métodos mapeados nas classes do projeto
-            for method in root.findall(".//Method"):
-                # Ignora construtores gerados automaticamente ou sem pontos de sequência válidos
-                if method.get("skippedDueTo") is not None:
-                    continue
-                
-                # Coleta dados de Métodos visitados
-                is_visited = method.get("visited") == "true"
-                total_methods += 1
-                if is_visited:
-                    visited_methods += 1
-
-                # Coleta dados de Linhas de Código (SequencePoints no OpenCover)
-                for sp in method.findall(".//SequencePoint"):
-                    total_sequence_points += 1
-                    if int(sp.get("vc", 0)) > 0: # vc = visit count
-                        visited_sequence_points += 1
-        except Exception as e:
-            continue
-
-    line_pct = (visited_sequence_points / total_sequence_points * 100) if total_sequence_points > 0 else 0.0
-    method_pct = (visited_methods / total_methods * 100) if total_methods > 0 else 0.0
-
-    return {
-        "line": round(line_pct, 2),
-        "method": round(method_pct, 2),
-        "found_files": len(opencover_files)
-    }
+from utils import parse_test_results,calculate_opencover_metrics
 
 if __name__ == "__main__":
     artifacts_dir = sys.argv[1] if len(sys.argv) > 1 else "/app/artifacts"

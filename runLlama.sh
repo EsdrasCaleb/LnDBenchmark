@@ -58,4 +58,4 @@ docker run --rm \
   --env EDITORTEST_FOLDER \
   --env HAS_GPU="$HAS_GPU" \
   $IMAGE_NAME \
-  /app/pipelineLlama.sh 2>&1 | tee "$ARTIFACTS_DIR/pipeline_execution.log"
+  /app/pipeline.sh 2>&1 | tee "$ARTIFACTS_DIR/pipeline_execution.log"
