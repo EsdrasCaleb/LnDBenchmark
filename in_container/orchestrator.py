@@ -416,15 +416,41 @@ def run_vllm(model_name):
             return None
         time.sleep(5)
 
+
 def kill_zombie_servers(port="11434"):
-    """Força a liberação da porta matando qualquer processo preso nela."""
-    try:
-        # Comando de SO para matar processos segurando a porta
-        subprocess.run(f"fuser -k {port}/tcp", shell=True, check=False, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL, capture_output=True)
-        time.sleep(3) # Dá tempo para o sistema operacional liberar o socket
-    except Exception:
-        print(Exception)
-        pass
+    """Força a liberação da porta e aguarda ativamente até que ela esteja livre."""
+    print(f"🧹 [Limpeza] Garantindo que a porta {port} esteja livre...")
+
+    # 1. Tenta matar os processos usando a porta de forma nativa
+    # Funciona para vLLM (Python) e Llama.cpp (binário/python)
+    os.system(f"fuser -k {port}/tcp >/dev/null 2>&1")
+    os.system(f"pkill -f vllm.entrypoints >/dev/null 2>&1")  # Garante contra o vLLM
+    os.system(f"pkill -f llama_cpp >/dev/null 2>&1")  # Garante contra o Llama.cpp
+
+    # 2. Loop de verificação ativa (Wait)
+    # Aguarda até 30 segundos para a porta fechar completamente no SO
+    max_checks = 15
+    port_free = False
+
+    for i in range(max_checks):
+        # fuser retorna código de saída 0 se achar alguém usando a porta,
+        # ou maior que 0 se a porta estiver completamente vazia.
+        exit_code = os.system(f"fuser {port}/tcp >/dev/null 2>&1")
+
+        if exit_code != 0:
+            port_free = True
+            break
+
+        print(f"⏳ Porta {port} ainda ocupada ou limpando VRAM... Aguardando 2s (Tentativa {i + 1}/{max_checks})")
+        time.sleep(2)
+
+    if port_free:
+        print(f"🟢 Excelente! Porta {port} totalmente liberada.")
+    else:
+        print(f"⚠️ Alerta: A porta {port} não liberou no tempo esperado, tentando prosseguir mesmo assim.")
+
+    # Uma folga extra para o driver da GPU (CUDA Context) resetar
+    time.sleep(3)
 
 # =====================================================================
 # 🦙 BACKEND 2: LLAMA.CPP (MODELOS GGUF QUANTISED)
