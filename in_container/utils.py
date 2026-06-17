@@ -142,6 +142,30 @@ def clear_leftover_tests():
                 except Exception as e:
                     print(f"⚠️ Não foi possível remover resíduo {item}: {e}")
 
+def move_generated_tests(env_var_name, destination_subfolder, model_dir):
+    """Auxiliar para mover arquivos gerados liberando espaço mantendo os .asmdef."""
+    folder_path = os.environ.get(env_var_name)
+    folder_path = folder_path.replace('"', '').replace("'", "").strip()
+    if not folder_path:
+        return
+    if not os.path.isabs(folder_path):
+        folder_path = os.path.join("/app/project", folder_path)
+    if not os.path.exists(folder_path):
+        return
+
+    target_dir = os.path.join(model_dir, destination_subfolder)
+    os.makedirs(target_dir, exist_ok=True)
+
+    print(f"📦 Movendo arquivos de: {folder_path} -> {target_dir}")
+    for item in os.listdir(folder_path):
+        item_path = os.path.join(folder_path, item)
+        if item.endswith((".asmdef", ".asmdef.meta", ".asmdev", ".asmdev.meta")):
+            continue
+        try:
+            shutil.move(item_path, os.path.join(target_dir, item))
+        except Exception as e:
+            print(f"⚠️ Falha ao mover {item}: {e}")
+
 def kill_zombie_servers(port="11434"):
     """Limpeza cirúrgica de processos usando psutil."""
     print(f"🧹 [Limpeza] Iniciando faxina com psutil...")

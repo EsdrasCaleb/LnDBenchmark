@@ -6,6 +6,7 @@ From: pytorch/pytorch:2.4.0-cuda12.1-cudnn9-devel
     export PATH="/usr/local/cuda/bin:/opt/Unity:${PATH}"
     export LD_LIBRARY_PATH="/usr/local/cuda/lib64:/usr/local/lib:${LD_LIBRARY_PATH}"
     export HF_HOME="/tmp/huggingface"
+    export SINGULARITYENV_PWD=/app
 
 %post
     export DEBIAN_FRONTEND=noninteractive
@@ -28,7 +29,7 @@ From: pytorch/pytorch:2.4.0-cuda12.1-cudnn9-devel
     rm -rf /tmp/unity-download
 
     # 3. Instala pacotes Python + Biblioteca Python compilada para CUDA
-    pip3 install --no-cache-dir huggingface_hub pandas requests psutil nvidia-ml-py llama-cpp-python
+    pip3 install --no-cache-dir huggingface_hub pandas requests psutil nvidia-ml-py
 
     # 🔥 3b. Baixa o binário oficial Vulkan e instala corretamente
     wget "https://github.com/ggml-org/llama.cpp/releases/download/b9673/llama-b9673-bin-ubuntu-vulkan-x64.tar.gz" -O llama.tar.gz
@@ -48,9 +49,7 @@ From: pytorch/pytorch:2.4.0-cuda12.1-cudnn9-devel
     in_container/parse_results.py /app/parse_results.py
     in_container/utils.py /app/utils.py
     in_container/pipeline.sh /app/pipeline.sh
-    in_container/pipelineLlama.sh /app/pipelineLlama.sh
 
 %runscript
     chmod +x /app/pipeline.sh
-    chmod +x /app/pipelineLlama.sh
     exec /bin/bash /app/pipeline.sh

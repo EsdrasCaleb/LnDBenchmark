@@ -13,32 +13,10 @@ import csv
 import time
 import threading
 import os
-from utils import kill_zombie_servers, ResourceMonitor,parse_test_results,calculate_opencover_metrics
+from utils import kill_zombie_servers, ResourceMonitor,parse_test_results, clear_leftover_tests,move_generated_tests
 
 
-def move_generated_tests(env_var_name, destination_subfolder, model_dir):
-    """Auxiliar para mover arquivos gerados liberando espaço mantendo os .asmdef."""
-    folder_path = os.environ.get(env_var_name)
-    folder_path = folder_path.replace('"', '').replace("'", "").strip()
-    if not folder_path:
-        return
-    if not os.path.isabs(folder_path):
-        folder_path = os.path.join("/app/project", folder_path)
-    if not os.path.exists(folder_path):
-        return
 
-    target_dir = os.path.join(model_dir, destination_subfolder)
-    os.makedirs(target_dir, exist_ok=True)
-
-    print(f"📦 Movendo arquivos de: {folder_path} -> {target_dir}")
-    for item in os.listdir(folder_path):
-        item_path = os.path.join(folder_path, item)
-        if item.endswith((".asmdef", ".asmdef.meta", ".asmdev", ".asmdev.meta")):
-            continue
-        try:
-            shutil.move(item_path, os.path.join(target_dir, item))
-        except Exception as e:
-            print(f"⚠️ Falha ao mover {item}: {e}")
 
 def generate_global_leaderboard(models_root_dir, backend_name):
     """Cria o ranking unificado de todos os modelos processados."""
@@ -91,9 +69,9 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
     clear_leftover_tests()
 
     print(f"🛠️  [Unity] Executando geração de casos de teste via {backend_name.upper()}...")
-    monitor = ResourceMonitor(model_name=model_name, output_file="/app/artifacts/performance_report.csv")
+    monitor = ResourceMonitor(model_name=model_safe_name, output_file="/app/artifacts/performance_report.csv")
 
-    print(f"🛠️ [Unity] Iniciando geração e monitoramento: {model_name}")
+    print(f"🛠️ [Unity] Iniciando geração e monitoramento: {model_safe_name}")
     monitor.start()
 
     try:
@@ -105,7 +83,7 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
         ], check=False)
     finally:
         monitor.stop()  # Garante que para mesmo se a Unity crashar
-        print(f"✅ Monitoramento finalizado para {model_name}.")
+        print(f"✅ Monitoramento finalizado para {model_safe_name}.")
 
     gen_csv_path = os.path.join(model_dir, "testGeneration.csv")
     has_success = False
@@ -226,7 +204,7 @@ def get_best_gguf_models(limit=5, completed_models=None):
     
     print("🔍 Buscando modelos GGUF no Hugging Face...")
     # 🔥 COMBINAÇÃO VENCEDORA: Só traz GGUFs que são listados como Text-Generation
-    available_models = api.list_models(filter=["gguf", "text-generation"], sort="downloads",direction=-1, full=True)
+    available_models = api.list_models(filter=["gguf", "text-generation"], sort="downloads",full=True)
     filtered_models = []
     
     for model in available_models:
@@ -393,7 +371,7 @@ def main():
     #     models_to_test = get_best_code_models(limit=0, completed_models=completed_models)
     # else:
     print("🦙 MODO SELECIONADO: PIPELINE LLAMA.CPP (Modelos GGUF compactos)")
-    models_to_test = get_best_gguf_models(limit=5, completed_models=completed_models)
+    models_to_test = get_best_gguf_models(limit=0, completed_models=completed_models)
 
     if not models_to_test:
         print(f"🏁 [CONCLUÍDO] Nenhum modelo restante para processar com o backend {args.backend.upper()}!")
