@@ -284,9 +284,11 @@ def get_best_code_models(limit=5, completed_models=None):
 
     # Foca explicitamente em geração de texto
     available_models = api.list_models(filter=["code", "text-generation"], sort="trending_score", full=True)
+    print(f"Total de modelos encontrados: {len(available_models)}")
     filtered_models = []
     for model in available_models:
         if model.modelId in blacklist or model.modelId in completed_models:
+            print("🚫 LISTA NEGRA: " + model_id_lower)
             continue
 
         model_id_lower = model.modelId.lower()
@@ -294,6 +296,7 @@ def get_best_code_models(limit=5, completed_models=None):
         # 🚫 LISTA NEGRA: Formatos incompatíveis com vLLM
         bad_formats = ["gguf", "ggml", "mlx", "coreml", "openvino", "onnx", "exl2", "tflite"]
         if any(bad in model_id_lower for bad in bad_formats):
+            print("🚫 LISTA NEGRA: Formatos incompatíveis com vLLM:"+model_id_lower)
             continue
 
         try:
