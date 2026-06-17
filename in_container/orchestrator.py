@@ -288,7 +288,7 @@ def get_best_code_models(limit=5, completed_models=None):
     filtered_models = []
     for model in available_models:
         if model.modelId in blacklist or model.modelId in completed_models:
-            print("🚫 LISTA NEGRA: " + model_id_lower)
+            print("🚫 LISTA NEGRA: " + model.modelId)
             continue
 
         model_id_lower = model.modelId.lower()
