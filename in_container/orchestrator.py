@@ -283,7 +283,7 @@ def get_best_code_models(limit=5, completed_models=None):
     api = HfApi(token=hf_token)
 
     # Foca explicitamente em geração de texto
-    available_models = api.list_models(filter=["code", "text-generation"], sort=["trending_score"],direction=-1, full=True)
+    available_models = api.list_models(filter=["code", "text-generation"], sort="downloads",direction=-1, full=True)
 
     filtered_models = []
     for model in available_models:
@@ -445,7 +445,7 @@ def get_best_gguf_models(limit=5, completed_models=None):
     
     print("🔍 Buscando modelos GGUF no Hugging Face...")
     # 🔥 COMBINAÇÃO VENCEDORA: Só traz GGUFs que são listados como Text-Generation
-    available_models = api.list_models(filter=["gguf", "text-generation"], sort="downloads", full=True)
+    available_models = api.list_models(filter=["gguf", "text-generation"], sort="downloads",direction=-1, full=True)
     filtered_models = []
     
     for model in available_models:
