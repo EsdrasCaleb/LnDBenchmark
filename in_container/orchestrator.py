@@ -284,7 +284,7 @@ def get_best_code_models(limit=5, completed_models=None):
 
     # Foca explicitamente em geração de texto
     available_models = api.list_models(filter=["code", "text-generation"], sort="trending_score", full=True)
-    print(f"Total de modelos encontrados: {len(available_models)}")
+
     filtered_models = []
     for model in available_models:
         if model.modelId in blacklist or model.modelId in completed_models:
