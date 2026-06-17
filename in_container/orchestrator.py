@@ -359,9 +359,11 @@ def run_vllm(model_name):
         "python3", "-u", "-m", "vllm.entrypoints.openai.api_server",
         "--model", model_name,
         "--port", "11434",
-        "--max-model-len", "2048",
+        "--gpu-memory-utilization", "0.90",
+        "--max-model-len", "4096",
         "--served-model-name", "vllmModel",
-        "--trust-remote-code"
+        "--trust-remote-code",
+        "--dtype", "auto"
     ]
     
     run_env = os.environ.copy()
