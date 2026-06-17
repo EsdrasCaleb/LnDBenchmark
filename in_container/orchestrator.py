@@ -284,7 +284,7 @@ def get_best_code_models(limit=5, completed_models=None):
     BIG_TECHS = ["google", "meta-llama", "microsoft", "qwen", "deepseek-ai", "mistralai", "codellama", "salesforce", "ibm-granite"]
 
     # Foca explicitamente em geração de texto
-    available_models = api.list_models(filter=["code", "text-generation"], sort="trending_score", full=True)
+    available_models = api.list_models(filter=["text-generation"], sort="trending_score", full=True)
     filtered_models = []
     
     for model in available_models:
@@ -494,7 +494,7 @@ def get_best_gguf_models(limit=5, completed_models=None):
             "identifier": model_identifier
         })
         print(f"✅ Selecionado GGUF: {model_identifier} (~{chosen_file['size_gb']:.2f} GB)")
-        if limit>0 and len(filtered_models) >= limit:
+        if limit and len(filtered_models) >= limit:
             break
             
     filtered_models.sort(key=lambda x: x["size_gb"])
