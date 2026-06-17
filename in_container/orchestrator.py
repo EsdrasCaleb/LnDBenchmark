@@ -290,7 +290,7 @@ def get_best_code_models(limit=5, completed_models=None):
     for model in available_models:
         if model.modelId in blacklist or model.modelId in completed_models:
             continue
-
+        parts = model.modelId.split("/")
         if len(parts) < 2 or parts[0].lower() not in BIG_TECHS:
             continue
         model_id_lower = model.modelId.lower()
