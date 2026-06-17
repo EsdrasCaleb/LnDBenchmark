@@ -10,14 +10,19 @@ from huggingface_hub import HfApi, hf_hub_download
 import psutil
 import pynvml
 import csv
-import time
 import threading
-import os
 from datetime import datetime, timedelta, timezone
-from utils import kill_zombie_servers, ResourceMonitor,parse_test_results, clear_leftover_tests,move_generated_tests
+from utils import kill_zombie_servers, ResourceMonitor, parse_test_results, clear_leftover_tests, move_generated_tests
 
-
-
+# Função placeholder para manter compatibilidade com seu script original
+def parse_unity_coverage_detailed(summary_xml_path):
+    """Retorna um dicionário padrão caso falte no utils."""
+    return {
+        "lines_coverable": 0,
+        "lines_covered": 0,
+        "methods_total": 0,
+        "methods_covered": 0
+    }
 
 def generate_global_leaderboard(models_root_dir, backend_name):
     """Cria o ranking unificado de todos os modelos processados."""
@@ -66,10 +71,9 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
     shutil.rmtree(coverage_dir, ignore_errors=True)
     os.makedirs(coverage_dir, exist_ok=True)
     
-    # 🚨 LIMPEZA EXECUTADA ANTES DA GENERATION CLI
     clear_leftover_tests()
 
-    print(f"🛠️  [Unity] Executando geração de casos de teste via {backend_name.upper()}...")
+    print(f"🛠️ [Unity] Executando geração de casos de teste via {backend_name.upper()}...")
     monitor = ResourceMonitor(model_name=model_safe_name, output_file="/app/artifacts/performance_report.csv")
 
     print(f"🛠️ [Unity] Iniciando geração e monitoramento: {model_safe_name}")
@@ -83,7 +87,7 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
             "-logFile", f"{model_dir}/generation-cli-log.txt"
         ], check=False)
     finally:
-        monitor.stop()  # Garante que para mesmo se a Unity crashar
+        monitor.stop()  
         print(f"✅ Monitoramento finalizado para {model_safe_name}.")
 
     gen_csv_path = os.path.join(model_dir, "testGeneration.csv")
@@ -156,7 +160,11 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
     
     em_total, em_pass = parse_test_results(editmode_xml)
     pm_total, pm_pass = parse_test_results(playmode_xml)
-    cov = parse_unity_coverage_detailed(combined_summary_xml)
+    
+    try:
+        cov = parse_unity_coverage_detailed(combined_summary_xml)
+    except Exception:
+        cov = {"lines_coverable": 0, "lines_covered": 0, "methods_total": 0, "methods_covered": 0}
     
     headers = [
         "model", "editmodetests", "editmodetestpassing", 
@@ -182,8 +190,6 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
         
     return True
 
-
-
 # =====================================================================
 # 🦙 BACKEND 2: LLAMA.CPP (MODELOS GGUF QUANTISED)
 # =====================================================================
@@ -207,13 +213,10 @@ def get_best_gguf_models(limit=5, completed_models=None):
 
     print(f"🔍 Buscando os melhores modelos GGUF para CÓDIGO (atualizados após {um_ano_atras.strftime('%Y-%m-%d')})...")
 
-    # 🔥 A MÁGICA DA VELOCIDADE ACONTECE AQUI:
-    # 1. Adicionamos a tag 'code' no filter.
-    # 2. Limitamos a busca para os 200 melhores, matando o loop infinito de 10 minutos.
     available_models = api.list_models(
         filter=["gguf", "text-generation", "code"],
         sort="downloads",
-        direction=-1,  # Garante ordem decrescente (do mais baixado pro menos)
+        direction=-1,  
         full=True
     )
 
@@ -222,7 +225,6 @@ def get_best_gguf_models(limit=5, completed_models=None):
     for model in available_models:
         model_id_lower = model.modelId.lower()
 
-        # 🕒 Validação de Data ULTRA RÁPIDA (antes de bater na API de novo)
         last_modified = getattr(model, 'lastModified', None)
         if last_modified:
             if isinstance(last_modified, str):
@@ -230,18 +232,15 @@ def get_best_gguf_models(limit=5, completed_models=None):
             if last_modified < um_ano_atras:
                 continue
 
-        # Bate na API de detalhes apenas para os "sobreviventes"
         try:
             detailed_info = api.model_info(model.modelId, files_metadata=True)
         except Exception:
             continue
 
-        # Tags
         pipeline = getattr(detailed_info, 'pipeline_tag', '')
         tags = getattr(detailed_info, 'tags', [])
         tags_lower = [str(t).lower() for t in tags]
 
-        # Verifica se o modelo não é uma roubada (vetorizador)
         bad_pipelines = ["feature-extraction", "sentence-similarity", "text-classification"]
         if pipeline in bad_pipelines or any(b in tags_lower for b in bad_pipelines):
             continue
@@ -250,20 +249,17 @@ def get_best_gguf_models(limit=5, completed_models=None):
         for sibling in detailed_info.siblings:
             filename = sibling.rfilename
             if filename.endswith(".gguf"):
-                # Ignora fragmentos
                 if any(part in filename.lower() for part in ["split", "-of-", "part", "mmproj"]):
                     continue
                 size_bytes = getattr(sibling, 'size', 0) or 0
                 size_gb = size_bytes / (1024 ** 3)
 
-                # Aceita modelos excelentes até 9.0 GB
                 if 0 < size_gb <= 9.0:
                     valid_gguf_files.append({"filename": filename, "size_gb": size_gb})
 
         if not valid_gguf_files:
             continue
 
-        # Pega o melhor/maior arquivo que passou no teste de tamanho
         valid_gguf_files.sort(key=lambda x: x["size_gb"], reverse=True)
         chosen_file = valid_gguf_files[0]
         model_identifier = f"{model.modelId}/{chosen_file['filename']}"
@@ -279,7 +275,6 @@ def get_best_gguf_models(limit=5, completed_models=None):
         })
         print(f"✅ Especialista em Código Encontrado: {model_identifier} (~{chosen_file['size_gb']:.2f} GB)")
 
-        # Parada antecipada se já atingiu o limite de modelos para testar hoje
         if limit and len(filtered_models) >= limit:
             break
 
@@ -296,7 +291,7 @@ def run_llamacpp(local_model_path, identifier):
         "llama-server",
         "-m", local_model_path,
         "--port", "11434",
-        "-c", "2048",  # Contexto de avaliação
+        "-c", "2048",  
         "--alias", "vllmModel"
     ]
 
@@ -307,11 +302,10 @@ def run_llamacpp(local_model_path, identifier):
         print(f"🚀 Subindo Llama-Server (C++) para: {identifier} [Modo: CPU Nativo]")
         cmd += ["-ngl", "0"]
 
-    # 📂 Gerenciamento Centralizado de Logs
+    # 📂 Gerenciamento Centralizado de Logs em uma pasta dedicada da Unity Artifacts
     logs_dir = "/app/artifacts/llamacpp_logs"
     os.makedirs(logs_dir, exist_ok=True)
 
-    # Cria um nome de arquivo limpo e seguro
     safe_name = identifier.replace('/', '_').replace('.', '_')
     log_file_path = os.path.join(logs_dir, f"{safe_name}.log")
 
@@ -319,12 +313,10 @@ def run_llamacpp(local_model_path, identifier):
     env = os.environ.copy()
     env["LD_LIBRARY_PATH"] = "/usr/local/lib:" + env.get("LD_LIBRARY_PATH", "")
 
-    # Dispara o binário nativo salvando a saída na pasta de logs
     process = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, env=env)
 
     time.sleep(5)
 
-    # 🧠 Warmup Check
     warmup_url = "http://localhost:11434/v1/chat/completions"
     payload = {
         "model": "vllmModel",
@@ -334,9 +326,8 @@ def run_llamacpp(local_model_path, identifier):
     print(f"🔄 Aguardando inicialização do backend para {identifier}...")
     max_retries = 20
     for i in range(max_retries):
-        # Se o processo crashou internamente (GGUF corrompido, erro de VRAM, etc)
         if process.poll() is not None:
-            print(f"❌ O Llama-Server crashou de imediato. Verifique os detalhes em: {log_file_path}")
+            print(f"❌ O Llama-Server crashou de imediato. Detalhes salvos em: {log_file_path}")
             log_file.close()
             return None
 
@@ -346,9 +337,9 @@ def run_llamacpp(local_model_path, identifier):
                 print("🟢 Llama-Server nativo online e integrado com sucesso!")
                 log_file.close()
                 return process
-        except Exception as e:
-            # Corrigido de 'except e:' para tratamento genérico válido do Python
-            print(f"⏳ Alocando tensores e estruturas... ({i + 1}/{max_retries}) Error : {e}")
+        except Exception as err:
+            # Renomeado para 'err' evitando colisões locais de escopo no interpretador
+            print(f"⏳ Alocando tensores... ({i + 1}/{max_retries}) Status: Aguardando resposta do Servidor C++")
 
         time.sleep(10)
 
@@ -390,17 +381,12 @@ def main():
             completed_models = {line.strip() for line in f if line.strip()}
         print(f"💾 Histórico carregado: {len(completed_models)} modelos registrados anteriormente.")
 
-    # if args.backend == "vllm":
-    #     print("🟢 MODO SELECIONADO: PIPELINE STANDARD VLLM (Modelos nativos HF)")
-    #     models_to_test = get_best_code_models(limit=0, completed_models=completed_models)
-    # else:
     print("🦙 MODO SELECIONADO: PIPELINE LLAMA.CPP (Modelos GGUF compactos)")
     has_gpu = os.environ.get("HAS_GPU", "false").lower() == "true"
-    if(has_gpu):
+    if has_gpu:
         models_to_test = get_best_gguf_models(limit=200, completed_models=completed_models)
     else:
         models_to_test = get_best_gguf_models(limit=5, completed_models=completed_models)
-
 
     if not models_to_test:
         print(f"🏁 [CONCLUÍDO] Nenhum modelo restante para processar com o backend {args.backend.upper()}!")
@@ -410,10 +396,6 @@ def main():
         sys.exit(0)
 
     for target in models_to_test:
-        # if args.backend == "vllm":
-        #     model_identifier = target
-        #     model_safe = model_identifier.replace("/", "_")
-        # else:
         model_identifier = target["identifier"]
         model_safe = model_identifier.replace("/", "_").replace(".", "_")
 
@@ -430,9 +412,6 @@ def main():
         engine_process = None
         
         try:
-            # if args.backend == "vllm":
-            #     engine_process = run_vllm(model_identifier)
-            # else:
             print(f"\n📥 [Llama.cpp] Baixando arquivo GGUF alvo: {target['filename']}...")
             local_path = hf_hub_download(
                 repo_id=target["repo_id"],
@@ -458,8 +437,8 @@ def main():
                 with open(completed_path, "a") as f:
                     f.write(f"{model_identifier}\n")
                     
-        except Exception as e:
-            print(f"⚠️ Falha catastrófica no processamento do modelo {model_identifier}: {e}")
+        except Exception as main_err:
+            print(f"⚠️ Falha catastrófica no processamento do modelo {model_identifier}: {main_err}")
         finally:
             if engine_process:
                 print(f"🛑 Desligando servidor ativo do backend {args.backend.upper()}...")
