@@ -73,6 +73,7 @@ singularity exec --nv --writable-tmpfs \
   --bind "$PROJECT_PATH":/app/project \
   --bind "$ARTIFACTS_DIR":/app/artifacts \
   --bind ./in_container/orchestrator.py:/app/orchestrator.py \
+  --bind ./in_container/utils.py:/app/utils.py \
   --bind ./in_container/pipeline.sh:/app/pipeline.sh \
   "$SCRATCH_DIR/unity-vllm-bench.sif" /app/pipeline.sh
 
