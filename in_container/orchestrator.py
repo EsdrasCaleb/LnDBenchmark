@@ -203,74 +203,67 @@ def get_best_gguf_models(limit=5, completed_models=None):
     hf_token = os.environ.get("HF_TOKEN")
     api = HfApi(token=hf_token)
 
-    # 🔥 Filtro Temporal: Calcula a data limite (1 ano atrás a partir de hoje)
-    # Usamos timezone.utc para evitar problemas de fuso horário com a API do HF
     um_ano_atras = datetime.now(timezone.utc) - timedelta(days=365)
 
-    print(f"🔍 Buscando modelos GGUF recentes (atualizados após {um_ano_atras.strftime('%Y-%m-%d')}) no Hugging Face...")
+    print(f"🔍 Buscando os melhores modelos GGUF para CÓDIGO (atualizados após {um_ano_atras.strftime('%Y-%m-%d')})...")
 
-    # Buscamos a lista com full=True para garantir o acesso aos metadados completos
-    available_models = api.list_models(filter=["gguf", "text-generation"], sort="downloads", full=True)
+    # 🔥 A MÁGICA DA VELOCIDADE ACONTECE AQUI:
+    # 1. Adicionamos a tag 'code' no filter.
+    # 2. Limitamos a busca para os 200 melhores, matando o loop infinito de 10 minutos.
+    available_models = api.list_models(
+        filter=["gguf", "text-generation", "code"],
+        sort="downloads",
+        direction=-1,  # Garante ordem decrescente (do mais baixado pro menos)
+        full=True
+    )
+
     filtered_models = []
 
     for model in available_models:
         model_id_lower = model.modelId.lower()
 
-        # 🕒 Validação de Data: Ignora o modelo se ele for mais antigo que 1 ano
-        # O HF costuma retornar o lastModified como string ISO ou datetime object
+        # 🕒 Validação de Data ULTRA RÁPIDA (antes de bater na API de novo)
         last_modified = getattr(model, 'lastModified', None)
         if last_modified:
-            # Converte para datetime se vier como string ISO
             if isinstance(last_modified, str):
-                # Remove o 'Z' ou offsets para converter de forma segura
                 last_modified = datetime.fromisoformat(last_modified.replace('Z', '+00:00'))
-
-            # Se a atualização foi antes da nossa janela de 1 ano, descarta!
             if last_modified < um_ano_atras:
                 continue
 
+        # Bate na API de detalhes apenas para os "sobreviventes"
         try:
             detailed_info = api.model_info(model.modelId, files_metadata=True)
         except Exception:
             continue
 
-        # 1. Pega as tags oficiais e a categoria principal
+        # Tags
         pipeline = getattr(detailed_info, 'pipeline_tag', '')
         tags = getattr(detailed_info, 'tags', [])
         tags_lower = [str(t).lower() for t in tags]
 
-        # 2. Rejeição Oficial: Se o Hugging Face diz que é de vetorização, cai fora
+        # Verifica se o modelo não é uma roubada (vetorizador)
         bad_pipelines = ["feature-extraction", "sentence-similarity", "text-classification"]
         if pipeline in bad_pipelines or any(b in tags_lower for b in bad_pipelines):
-            continue
-
-        # 3. Aprovação Principal: O Hugging Face PRECISA dizer que é gerador de texto
-        if pipeline != "text-generation" and "text-generation" not in tags_lower:
-            continue
-
-        # 4. Verificação de Instruct/Chat
-        is_chat_tagged = any(t in tags_lower for t in ["conversational", "instruction-tuning", "chat", "instruct"])
-        is_chat_named = any(word in model_id_lower for word in ["instruct", "chat", "-it", "it-"])
-
-        if not (is_chat_tagged or is_chat_named):
             continue
 
         valid_gguf_files = []
         for sibling in detailed_info.siblings:
             filename = sibling.rfilename
             if filename.endswith(".gguf"):
+                # Ignora fragmentos
                 if any(part in filename.lower() for part in ["split", "-of-", "part", "mmproj"]):
                     continue
                 size_bytes = getattr(sibling, 'size', 0) or 0
                 size_gb = size_bytes / (1024 ** 3)
 
-                # 🔥 Novo limite atualizado para 9.0 GB (Aceita Q8 de modelos 8B)
+                # Aceita modelos excelentes até 9.0 GB
                 if 0 < size_gb <= 9.0:
                     valid_gguf_files.append({"filename": filename, "size_gb": size_gb})
 
         if not valid_gguf_files:
             continue
 
+        # Pega o melhor/maior arquivo que passou no teste de tamanho
         valid_gguf_files.sort(key=lambda x: x["size_gb"], reverse=True)
         chosen_file = valid_gguf_files[0]
         model_identifier = f"{model.modelId}/{chosen_file['filename']}"
@@ -284,9 +277,9 @@ def get_best_gguf_models(limit=5, completed_models=None):
             "size_gb": chosen_file["size_gb"],
             "identifier": model_identifier
         })
-        print(
-            f"✅ Selecionado GGUF: {model_identifier} (~{chosen_file['size_gb']:.2f} GB) | Atualizado em: {last_modified.strftime('%Y-%m-%d') if last_modified else 'N/A'}")
+        print(f"✅ Especialista em Código Encontrado: {model_identifier} (~{chosen_file['size_gb']:.2f} GB)")
 
+        # Parada antecipada se já atingiu o limite de modelos para testar hoje
         if limit and len(filtered_models) >= limit:
             break
 
@@ -391,7 +384,7 @@ def main():
     #     models_to_test = get_best_code_models(limit=0, completed_models=completed_models)
     # else:
     print("🦙 MODO SELECIONADO: PIPELINE LLAMA.CPP (Modelos GGUF compactos)")
-    models_to_test = get_best_gguf_models(limit=0, completed_models=completed_models)
+    models_to_test = get_best_gguf_models(limit=200, completed_models=completed_models)
 
     if not models_to_test:
         print(f"🏁 [CONCLUÍDO] Nenhum modelo restante para processar com o backend {args.backend.upper()}!")
