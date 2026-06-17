@@ -283,7 +283,7 @@ def get_best_code_models(limit=5, completed_models=None):
     api = HfApi(token=hf_token)
 
     # Foca explicitamente em geração de texto
-    available_models = api.list_models(filter=["code", "text-generation"], sort="last_modified",direction=-1, full=True)
+    available_models = api.list_models(filter=["code", "text-generation"], sort="downloads",direction=-1, full=True)
     BIG_TECHS = ["google", "meta-llama", "microsoft", "qwen", "deepseek-ai", "mistralai", "codellama", "salesforce", "ibm-granite"]
 
     filtered_models = []
