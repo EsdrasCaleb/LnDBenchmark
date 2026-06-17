@@ -281,49 +281,55 @@ def get_best_code_models(limit=5, completed_models=None):
 
     print("🔍 Buscando modelos recomendados no Hugging Face...")
     api = HfApi(token=hf_token)
-    BIG_TECHS = ["google", "meta-llama", "microsoft", "qwen", "deepseek-ai", "mistralai", "codellama", "salesforce", "ibm-granite"]
 
     # Foca explicitamente em geração de texto
     available_models = api.list_models(filter=["code", "text-generation"], sort="trending_score", full=True)
     filtered_models = []
-    
+
     for model in available_models:
         if model.modelId in blacklist or model.modelId in completed_models:
             continue
 
-        # parts = model.modelId.split("/")
-        # if len(parts) < 2 or parts[0].lower() not in BIG_TECHS:
-        #     continue
-            
         model_id_lower = model.modelId.lower()
+
+        # 🚫 LISTA NEGRA: Formatos incompatíveis com vLLM
+        bad_formats = ["gguf", "ggml", "mlx", "coreml", "openvino", "onnx", "exl2", "tflite"]
+        if any(bad in model_id_lower for bad in bad_formats):
+            continue
 
         try:
             detailed_info = api.model_info(model.modelId, files_metadata=True)
         except Exception:
             continue
 
-        # 1. Pega as tags oficiais e a categoria principal
         tags = getattr(detailed_info, 'tags', [])
         tags_lower = [str(t).lower() for t in tags]
 
-        # 3. Aprovação Principal: O Hugging Face PRECISA dizer que é gerador de texto
+        # 🚫 REJEIÇÃO 1: Precisa ser de geração de texto
         if "text-generation" not in tags_lower:
-            print("Regeitado por não ter de geraçaõ de texto")
-            print(tags_lower)
+            continue
+
+        # 🚫 REJEIÇÃO 2: Precisa ser compatível com a biblioteca transformers (Requisito do vLLM)
+        if "transformers" not in tags_lower:
+            continue
+
+        # 🚫 REJEIÇÃO 3: Filtro extra nas tags contra formatos concorrentes
+        if any(bad in tags_lower for bad in bad_formats):
             continue
 
         total_size_bytes = 0
         has_weights = False
         for sibling in detailed_info.siblings:
+            # vLLM prefere safetensors (recomendado) ou bin/pt.
             if sibling.rfilename.endswith(('.safetensors', '.bin', '.pt')):
                 has_weights = True
                 if hasattr(sibling, 'size') and sibling.size is not None:
                     total_size_bytes += sibling.size
-        
+
         size_gb = total_size_bytes / (1024 ** 3)
         is_small_by_params = False
-        is_awq_gptq = any(q in model_id_lower for q in ["awq", "gptq", "4bit"]) 
-        
+        is_awq_gptq = any(q in model_id_lower for q in ["awq", "gptq", "4bit"])
+
         for tag in detailed_info.tags:
             if tag.startswith("params:"):
                 try:
@@ -335,10 +341,10 @@ def get_best_code_models(limit=5, completed_models=None):
 
         if has_weights and ((0 < size_gb <= 7.8) or (total_size_bytes == 0 and is_small_by_params)):
             filtered_models.append(model.modelId)
-            print(f"✅ Identificado: {model.modelId} (~{size_gb:.2f} GB)")
-            if limit>0 and len(filtered_models) >= limit:
+            print(f"✅ Identificado p/ vLLM: {model.modelId} (~{size_gb:.2f} GB)")
+            if limit > 0 and len(filtered_models) >= limit:
                 break
-                
+
     return filtered_models
 
 def run_vllm(model_name):
