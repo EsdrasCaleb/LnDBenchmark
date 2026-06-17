@@ -262,7 +262,6 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
 # =====================================================================
 # 🔥 BACKEND 1: VLLM (MODELOS NATIVOS / HUGGING FACE)
 # =====================================================================
-
 def get_best_code_models(limit=5, completed_models=None):
     if completed_models is None:
         completed_models = set()
@@ -284,7 +283,8 @@ def get_best_code_models(limit=5, completed_models=None):
     api = HfApi(token=hf_token)
     BIG_TECHS = ["google", "meta-llama", "microsoft", "qwen", "deepseek-ai", "mistralai", "codellama", "salesforce", "ibm-granite"]
 
-    available_models = api.list_models(filter=["code", "text-generation"], sort="downloads", full=True)
+    # Foca explicitamente em geração de texto
+    available_models = api.list_models(filter=["code", "text-generation"], sort="trending_score", full=True)
     filtered_models = []
     
     for model in available_models:
@@ -296,12 +296,24 @@ def get_best_code_models(limit=5, completed_models=None):
             continue
             
         model_id_lower = model.modelId.lower()
-        if any(bad in model_id_lower for bad in ["gguf", "ggml", "bnb", "quantized"]):
-            continue
-            
+
         try:
             detailed_info = api.model_info(model.modelId, files_metadata=True)
         except Exception:
+            continue
+
+        # 1. Pega as tags oficiais e a categoria principal
+        pipeline = getattr(detailed_info, 'pipeline_tag', '')
+        tags = getattr(detailed_info, 'tags', [])
+        tags_lower = [str(t).lower() for t in tags]
+
+        # 2. Rejeição Oficial: Se o Hugging Face diz que é de vetorização, cai fora
+        bad_pipelines = ["feature-extraction", "sentence-similarity", "text-classification"]
+        if pipeline in bad_pipelines or any(b in tags_lower for b in bad_pipelines):
+            continue
+
+        # 3. Aprovação Principal: O Hugging Face PRECISA dizer que é gerador de texto
+        if pipeline != "text-generation" and "text-generation" not in tags_lower:
             continue
 
         total_size_bytes = 0
@@ -328,7 +340,7 @@ def get_best_code_models(limit=5, completed_models=None):
         if has_weights and ((0 < size_gb <= 7.8) or (total_size_bytes == 0 and is_small_by_params)):
             filtered_models.append(model.modelId)
             print(f"✅ Identificado: {model.modelId} (~{size_gb:.2f} GB)")
-            if len(filtered_models) >= limit:
+            if limit and len(filtered_models) >= limit:
                 break
                 
     return filtered_models
@@ -418,15 +430,41 @@ def get_best_gguf_models(limit=5, completed_models=None):
     api = HfApi(token=hf_token)
     
     print("🔍 Buscando modelos GGUF no Hugging Face...")
-    available_models = api.list_models(filter=["gguf"], sort="downloads", full=True)
+    # 🔥 COMBINAÇÃO VENCEDORA: Só traz GGUFs que são listados como Text-Generation
+    available_models = api.list_models(filter=["gguf", "text-generation"], sort="downloads", full=True)
     filtered_models = []
     
     for model in available_models:
+        model_id_lower = model.modelId.lower()
+
         try:
             detailed_info = api.model_info(model.modelId, files_metadata=True)
         except Exception:
             continue
+        # 1. Pega as tags oficiais e a categoria principal
+        pipeline = getattr(detailed_info, 'pipeline_tag', '')
+        tags = getattr(detailed_info, 'tags', [])
+        tags_lower = [str(t).lower() for t in tags]
 
+        # 2. Rejeição Oficial: Se o Hugging Face diz que é de vetorização, cai fora
+        bad_pipelines = ["feature-extraction", "sentence-similarity", "text-classification"]
+        if pipeline in bad_pipelines or any(b in tags_lower for b in bad_pipelines):
+            continue
+
+        # 3. Aprovação Principal: O Hugging Face PRECISA dizer que é gerador de texto
+        if pipeline != "text-generation" and "text-generation" not in tags_lower:
+            continue
+
+        # 4. Verificação de Instruct/Chat: 
+        # O modelo tem as tags oficiais de chat/instrução?
+        is_chat_tagged = any(t in tags_lower for t in ["conversational", "instruction-tuning", "chat", "instruct"])
+        
+        # Fallback de segurança: às vezes quem upou o GGUF esqueceu de colocar as tags oficiais,
+        # então se a tag falhar, checamos o nome apenas como última esperança.
+        is_chat_named = any(word in model_id_lower for word in ["instruct", "chat", "-it", "it-"])
+
+        if not (is_chat_tagged or is_chat_named):
+            continue
         valid_gguf_files = []
         for sibling in detailed_info.siblings:
             filename = sibling.rfilename
@@ -456,9 +494,10 @@ def get_best_gguf_models(limit=5, completed_models=None):
             "identifier": model_identifier
         })
         print(f"✅ Selecionado GGUF: {model_identifier} (~{chosen_file['size_gb']:.2f} GB)")
-        if len(filtered_models) >= limit:
+        if limit and len(filtered_models) >= limit:
             break
-                
+            
+    filtered_models.sort(key=lambda x: x["size_gb"])
     return filtered_models
 
 def run_llamacpp(local_model_path, identifier):
@@ -499,7 +538,7 @@ def run_llamacpp(local_model_path, identifier):
         "model": "vllmModel",
         "messages": [{"role": "user", "content": "hi"}]
     }
-    
+    print("Enviando requisição de.")
     max_retries = 20
     for i in range(max_retries):
         if process.poll() is not None:
@@ -510,6 +549,8 @@ def run_llamacpp(local_model_path, identifier):
         try:
             # Envia a requisição; se o binário carregou a VRAM, ele responde 200 na hora.
             response = requests.post(warmup_url, json=payload, timeout=15)
+            print(response)
+            print(response.status_code)
             if response.status_code == 200:
                 print("🟢 Llama-Server nativo online, com memória alocada e pronto para a Unity!")
                 log_file.close()
@@ -554,7 +595,7 @@ def main():
 
     if args.backend == "vllm":
         print("🟢 MODO SELECIONADO: PIPELINE STANDARD VLLM (Modelos nativos HF)")
-        models_to_test = get_best_code_models(limit=5, completed_models=completed_models)
+        models_to_test = get_best_code_models(limit=0, completed_models=completed_models)
     else:
         print("🦙 MODO SELECIONADO: PIPELINE LLAMA.CPP (Modelos GGUF compactos)")
         models_to_test = get_best_gguf_models(limit=5, completed_models=completed_models)

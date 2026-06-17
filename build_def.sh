@@ -8,5 +8,5 @@ export APPTAINER_CACHEDIR="$PWD/tmp_build"
 echo "🚀 Construindo SIF direto pelo Apptainer (Adeus Docker, salvando o SSD)..."
 sudo -E apptainer build --force unity-vllm-bench.sif singularity-unity-vllm.def
 
-rm -rf ./tmp_build
+sudo rm -rf ./tmp_build
 echo "✅ Concluído com sucesso!"
