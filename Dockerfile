@@ -49,18 +49,16 @@ RUN mkdir -p /tmp/unity-download \
     && rm -rf /tmp/unity-download
 
 # 🔥 4. COMPILAÇÃO NATIVA DO LLAMA.CPP COM SUPORTE CUDA (Infinita performance e estabilidade)
-RUN git clone https://github.com/ggml-org/llama.cpp.git /tmp/llama.cpp \
-    && cd /tmp/llama.cpp \
-    && mkdir build \
-    && cd build \
-    && cmake .. -GGML_CUDA=ON \
-    && cmake --build . --config Release --target llama-server \
-    && cp bin/llama-server /usr/local/bin/ \
-    && cd / \
-    && rm -rf /tmp/llama.cpp
+RUN wget "https://github.com/ggml-org/llama.cpp/releases/download/b9673/llama-b9673-bin-ubuntu-vulkan-x64.tar.gz" -O llama.tar.gz \
+    && mkdir -p /opt/llama \
+    && tar -xzf llama.tar.gz -C /opt/llama \
+    && find /opt/llama -type f -executable -exec cp {} /usr/local/bin/ \; \
+    && find /opt/llama -type f -name "*.so*" -exec cp {} /usr/local/lib/ \; \
+    && ldconfig \
+    && rm -rf llama.tar.gz /opt/llama
 
 # 5. Instala bibliotecas do Python (Incluindo os novos monitores)
-RUN pip3 install --no-cache-dir huggingface_hub pandas requests psutil nvidia-ml-py llama-cpp-python
+RUN pip3 install --no-cache-dir huggingface_hub pandas requests psutil nvidia-ml-py 
 
 ENV PATH="/opt/Unity:${PATH}"
 ENV HF_HOME="/tmp/huggingface"
