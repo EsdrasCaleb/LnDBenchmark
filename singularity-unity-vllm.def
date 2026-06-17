@@ -11,8 +11,7 @@ From: debian:bookworm-slim
 
 %setup
     mkdir -p "${SINGULARITY_ROOTFS}/tmp"
-    cp unity_installs/Unity-6000.3.11f1.tar.xz \
-       "${SINGULARITY_ROOTFS}/tmp/unity.tar.xz"
+    cp "$UNITY_ARCHIVE" "${SINGULARITY_ROOTFS}/tmp/unity.tar.xz"
 
 %files
     in_container/orchestrator.py /app/orchestrator.py
