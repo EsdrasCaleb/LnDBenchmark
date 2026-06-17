@@ -207,7 +207,6 @@ def get_best_gguf_models(limit=5, completed_models=None):
     available_models = api.list_models(
         filter=["gguf", "text-generation", "code"],
         sort="downloads",
-        direction=-1,  
         full=True
     )
 
@@ -215,7 +214,7 @@ def get_best_gguf_models(limit=5, completed_models=None):
 
     for model in available_models:
         model_id_lower = model.modelId.lower()
-
+        print(model.downloads)
         last_modified = getattr(model, 'lastModified', None)
         if last_modified:
             if isinstance(last_modified, str):

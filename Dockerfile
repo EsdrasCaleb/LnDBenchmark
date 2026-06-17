@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="${VIRTUAL_ENV}/bin:/opt/Unity:${PATH}"
 
-ENV LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
+ENV LD_LIBRARY_PATH="/usr/local/lib"
 ENV HF_HOME="/tmp/huggingface"
 ENV PYTHONUNBUFFERED=1
 

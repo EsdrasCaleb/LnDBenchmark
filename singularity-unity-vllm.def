@@ -9,11 +9,9 @@ From: debian:bookworm-slim
     export HF_HOME="/tmp/huggingface"
     export PYTHONUNBUFFERED=1
 
-%setup
-    mkdir -p "${SINGULARITY_ROOTFS}/tmp"
-    cp "$UNITY_ARCHIVE" "${SINGULARITY_ROOTFS}/tmp/unity.tar.xz"
 
 %files
+    /home/caleb/gameprojects/unityprojects/LnDBenchmark/unity_installs/Unity-6000.3.11f1.tar.xz /opt/installers/unity.tar.xz
     in_container/orchestrator.py /app/orchestrator.py
     in_container/parse_results.py /app/parse_results.py
     in_container/utils.py /app/utils.py
@@ -59,12 +57,17 @@ From: debian:bookworm-slim
 
     rm -rf /var/lib/apt/lists/*
 
+    echo "=== DEBUG ==="
+    ls -lah /opt
+    ls -lah /opt/installers || true
     # Unity
     mkdir -p /opt/Unity
-    tar -xJf /tmp/unity.tar.xz \
+    tar -xJf /opt/installers/unity.tar.xz \
         -C /opt/Unity \
         --strip-components=1
-    rm -f /tmp/unity.tar.xz
+
+    rm -rf /opt/installers
+        rm -f /tmp/unity.tar.xz
 
     # Python venv
     python3 -m venv /opt/venv
