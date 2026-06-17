@@ -284,26 +284,25 @@ def get_best_code_models(limit=5, completed_models=None):
 
     # Foca explicitamente em geração de texto
     available_models = api.list_models(filter=["code", "text-generation"], sort="last_modified",direction=-1, full=True)
+    BIG_TECHS = ["google", "meta-llama", "microsoft", "qwen", "deepseek-ai", "mistralai", "codellama", "salesforce", "ibm-granite"]
 
     filtered_models = []
     for model in available_models:
         if model.modelId in blacklist or model.modelId in completed_models:
-            print("🚫 LISTA NEGRA: " + model.modelId)
             continue
 
+        if len(parts) < 2 or parts[0].lower() not in BIG_TECHS:
+            continue
         model_id_lower = model.modelId.lower()
 
         # 🚫 LISTA NEGRA: Formatos incompatíveis com vLLM
         bad_formats = ["gguf", "ggml", "mlx", "coreml", "openvino", "onnx", "exl2", "tflite"]
         if any(bad in model_id_lower for bad in bad_formats):
-            print("🚫 LISTA NEGRA: Formatos incompatíveis com vLLM:"+model_id_lower)
             continue
 
         try:
             detailed_info = api.model_info(model.modelId, files_metadata=True)
         except Exception:
-            print("Erro de extraçao:")
-            print(ValueError)
             continue
 
         tags = getattr(detailed_info, 'tags', [])
@@ -311,20 +310,14 @@ def get_best_code_models(limit=5, completed_models=None):
 
         # 🚫 REJEIÇÃO 1: Precisa ser de geração de texto
         if "text-generation" not in tags_lower:
-            print("🚫 REJEIÇÃO 1: Precisa ser de geração de texto:")
-            print(tags_lower)
             continue
 
         # 🚫 REJEIÇÃO 2: Precisa ser compatível com a biblioteca transformers (Requisito do vLLM)
         if "transformers" not in tags_lower:
-            print("🚫 REJEIÇÃO 2: Precisa ser compatível com a biblioteca transformers (Requisito do vLLM)")
-            print(tags_lower)
             continue
 
         # 🚫 REJEIÇÃO 3: Filtro extra nas tags contra formatos concorrentes
         if any(bad in tags_lower for bad in bad_formats):
-            print("🚫 REJEIÇÃO 3: Filtro extra nas tags contra formatos concorrentes:" )
-            print(tags_lower)
             continue
 
         total_size_bytes = 0
@@ -347,8 +340,6 @@ def get_best_code_models(limit=5, completed_models=None):
                     if params <= 3.2 or (params <= 7.5 and is_awq_gptq):
                         is_small_by_params = True
                 except ValueError:
-                    print("Erro de valor:")
-                    print(ValueError)
                     pass
 
         if has_weights and ((0 < size_gb <= 7.8) or (total_size_bytes == 0 and is_small_by_params)):
