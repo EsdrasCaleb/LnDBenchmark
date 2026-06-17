@@ -13,6 +13,7 @@ import csv
 import time
 import threading
 import os
+from datetime import datetime, timedelta, timezone
 from utils import kill_zombie_servers, ResourceMonitor,parse_test_results, clear_leftover_tests,move_generated_tests
 
 
@@ -201,19 +202,38 @@ def get_best_gguf_models(limit=5, completed_models=None):
 
     hf_token = os.environ.get("HF_TOKEN")
     api = HfApi(token=hf_token)
-    
-    print("🔍 Buscando modelos GGUF no Hugging Face...")
-    # 🔥 COMBINAÇÃO VENCEDORA: Só traz GGUFs que são listados como Text-Generation
-    available_models = api.list_models(filter=["gguf", "text-generation"], sort="downloads",full=True)
+
+    # 🔥 Filtro Temporal: Calcula a data limite (1 ano atrás a partir de hoje)
+    # Usamos timezone.utc para evitar problemas de fuso horário com a API do HF
+    um_ano_atras = datetime.now(timezone.utc) - timedelta(days=365)
+
+    print(f"🔍 Buscando modelos GGUF recentes (atualizados após {um_ano_atras.strftime('%Y-%m-%d')}) no Hugging Face...")
+
+    # Buscamos a lista com full=True para garantir o acesso aos metadados completos
+    available_models = api.list_models(filter=["gguf", "text-generation"], sort="downloads", full=True)
     filtered_models = []
-    
+
     for model in available_models:
         model_id_lower = model.modelId.lower()
+
+        # 🕒 Validação de Data: Ignora o modelo se ele for mais antigo que 1 ano
+        # O HF costuma retornar o lastModified como string ISO ou datetime object
+        last_modified = getattr(model, 'lastModified', None)
+        if last_modified:
+            # Converte para datetime se vier como string ISO
+            if isinstance(last_modified, str):
+                # Remove o 'Z' ou offsets para converter de forma segura
+                last_modified = datetime.fromisoformat(last_modified.replace('Z', '+00:00'))
+
+            # Se a atualização foi antes da nossa janela de 1 ano, descarta!
+            if last_modified < um_ano_atras:
+                continue
 
         try:
             detailed_info = api.model_info(model.modelId, files_metadata=True)
         except Exception:
             continue
+
         # 1. Pega as tags oficiais e a categoria principal
         pipeline = getattr(detailed_info, 'pipeline_tag', '')
         tags = getattr(detailed_info, 'tags', [])
@@ -228,16 +248,13 @@ def get_best_gguf_models(limit=5, completed_models=None):
         if pipeline != "text-generation" and "text-generation" not in tags_lower:
             continue
 
-        # 4. Verificação de Instruct/Chat: 
-        # O modelo tem as tags oficiais de chat/instrução?
+        # 4. Verificação de Instruct/Chat
         is_chat_tagged = any(t in tags_lower for t in ["conversational", "instruction-tuning", "chat", "instruct"])
-        
-        # Fallback de segurança: às vezes quem upou o GGUF esqueceu de colocar as tags oficiais,
-        # então se a tag falhar, checamos o nome apenas como última esperança.
         is_chat_named = any(word in model_id_lower for word in ["instruct", "chat", "-it", "it-"])
 
         if not (is_chat_tagged or is_chat_named):
             continue
+
         valid_gguf_files = []
         for sibling in detailed_info.siblings:
             filename = sibling.rfilename
@@ -246,30 +263,33 @@ def get_best_gguf_models(limit=5, completed_models=None):
                     continue
                 size_bytes = getattr(sibling, 'size', 0) or 0
                 size_gb = size_bytes / (1024 ** 3)
-                
-                if 0 < size_gb <= 8.0:
+
+                # 🔥 Novo limite atualizado para 9.0 GB (Aceita Q8 de modelos 8B)
+                if 0 < size_gb <= 9.0:
                     valid_gguf_files.append({"filename": filename, "size_gb": size_gb})
-        
+
         if not valid_gguf_files:
             continue
-            
+
         valid_gguf_files.sort(key=lambda x: x["size_gb"], reverse=True)
         chosen_file = valid_gguf_files[0]
         model_identifier = f"{model.modelId}/{chosen_file['filename']}"
-        
+
         if model_identifier in blacklist or model_identifier in completed_models:
             continue
-            
+
         filtered_models.append({
             "repo_id": model.modelId,
             "filename": chosen_file["filename"],
             "size_gb": chosen_file["size_gb"],
             "identifier": model_identifier
         })
-        print(f"✅ Selecionado GGUF: {model_identifier} (~{chosen_file['size_gb']:.2f} GB)")
+        print(
+            f"✅ Selecionado GGUF: {model_identifier} (~{chosen_file['size_gb']:.2f} GB) | Atualizado em: {last_modified.strftime('%Y-%m-%d') if last_modified else 'N/A'}")
+
         if limit and len(filtered_models) >= limit:
             break
-            
+
     filtered_models.sort(key=lambda x: x["size_gb"])
     return filtered_models
 
