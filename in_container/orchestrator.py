@@ -340,7 +340,7 @@ def get_best_code_models(limit=5, completed_models=None):
         if has_weights and ((0 < size_gb <= 7.8) or (total_size_bytes == 0 and is_small_by_params)):
             filtered_models.append(model.modelId)
             print(f"✅ Identificado: {model.modelId} (~{size_gb:.2f} GB)")
-            if limit and len(filtered_models) >= limit:
+            if limit>0 and len(filtered_models) >= limit:
                 break
                 
     return filtered_models
@@ -494,7 +494,7 @@ def get_best_gguf_models(limit=5, completed_models=None):
             "identifier": model_identifier
         })
         print(f"✅ Selecionado GGUF: {model_identifier} (~{chosen_file['size_gb']:.2f} GB)")
-        if limit and len(filtered_models) >= limit:
+        if limit>0 and len(filtered_models) >= limit:
             break
             
     filtered_models.sort(key=lambda x: x["size_gb"])
