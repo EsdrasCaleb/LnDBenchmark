@@ -293,6 +293,7 @@ def get_best_code_models(limit=5, completed_models=None):
         parts = model.modelId.split("/")
         if len(parts) < 2 or parts[0].lower() not in BIG_TECHS:
             continue
+
         model_id_lower = model.modelId.lower()
 
         # 🚫 LISTA NEGRA: Formatos incompatíveis com vLLM
@@ -305,19 +306,17 @@ def get_best_code_models(limit=5, completed_models=None):
         except Exception:
             continue
 
-        tags = getattr(detailed_info, 'tags', [])
-        tags_lower = [str(t).lower() for t in tags]
+        pipeline = getattr(detailed_info, 'pipeline_tag', '').lower()
+        tags = [str(t).lower() for t in getattr(detailed_info, 'tags', [])]
 
-        # 🚫 REJEIÇÃO 1: Precisa ser de geração de texto
-        if "text-generation" not in tags_lower:
-            continue
+        # 2. Relaxamento dos filtros:
+        # Google e DeepSeek às vezes usam 'text-generation' e nada mais.
+        is_text_gen = (pipeline == "text-generation" or "text-generation" in tags)
 
-        # 🚫 REJEIÇÃO 2: Precisa ser compatível com a biblioteca transformers (Requisito do vLLM)
-        if "transformers" not in tags_lower:
-            continue
-
-        # 🚫 REJEIÇÃO 3: Filtro extra nas tags contra formatos concorrentes
-        if any(bad in tags_lower for bad in bad_formats):
+        # O vLLM consegue rodar modelos que não têm a tag 'transformers' explícita
+        # Removido a exigência de "transformers" na tag
+        if not is_text_gen:
+            print("Regeitado por tag:"+model_id_lower)
             continue
 
         safetensors_size = 0
