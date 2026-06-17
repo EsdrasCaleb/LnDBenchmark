@@ -283,7 +283,7 @@ def get_best_code_models(limit=5, completed_models=None):
     api = HfApi(token=hf_token)
 
     # Foca explicitamente em geração de texto
-    available_models = api.list_models(filter=["code", "text-generation"], sort="trending_score", full=True)
+    available_models = api.list_models(filter=["code", "text-generation"], sort=["trending_score"],direction=-1, full=True)
 
     filtered_models = []
     for model in available_models:
