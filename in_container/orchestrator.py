@@ -284,16 +284,16 @@ def get_best_code_models(limit=5, completed_models=None):
     BIG_TECHS = ["google", "meta-llama", "microsoft", "qwen", "deepseek-ai", "mistralai", "codellama", "salesforce", "ibm-granite"]
 
     # Foca explicitamente em geração de texto
-    available_models = api.list_models(filter=["text-generation"], sort="trending_score", full=True)
+    available_models = api.list_models(filter=["code", "text-generation"], sort="trending_score", full=True)
     filtered_models = []
     
     for model in available_models:
         if model.modelId in blacklist or model.modelId in completed_models:
             continue
 
-        parts = model.modelId.split("/")
-        if len(parts) < 2 or parts[0].lower() not in BIG_TECHS:
-            continue
+        # parts = model.modelId.split("/")
+        # if len(parts) < 2 or parts[0].lower() not in BIG_TECHS:
+        #     continue
             
         model_id_lower = model.modelId.lower()
 
@@ -303,17 +303,13 @@ def get_best_code_models(limit=5, completed_models=None):
             continue
 
         # 1. Pega as tags oficiais e a categoria principal
-        pipeline = getattr(detailed_info, 'pipeline_tag', '')
         tags = getattr(detailed_info, 'tags', [])
         tags_lower = [str(t).lower() for t in tags]
 
-        # 2. Rejeição Oficial: Se o Hugging Face diz que é de vetorização, cai fora
-        bad_pipelines = ["feature-extraction", "sentence-similarity", "text-classification"]
-        if pipeline in bad_pipelines or any(b in tags_lower for b in bad_pipelines):
-            continue
-
         # 3. Aprovação Principal: O Hugging Face PRECISA dizer que é gerador de texto
-        if pipeline != "text-generation" and "text-generation" not in tags_lower:
+        if "text-generation" not in tags_lower:
+            print("Regeitado por não ter de geraçaõ de texto")
+            print(tags_lower)
             continue
 
         total_size_bytes = 0
