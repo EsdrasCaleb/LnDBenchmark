@@ -286,68 +286,79 @@ def get_best_gguf_models(limit=5, completed_models=None):
     filtered_models.sort(key=lambda x: x["size_gb"])
     return filtered_models
 
+
 def run_llamacpp(local_model_path, identifier):
     kill_zombie_servers("11434")
     """Inicia o servidor binário C++ nativo do Llama.cpp."""
     has_gpu = os.environ.get("HAS_GPU", "false").lower() == "true"
-    
-    # Chamada direta para o executável compilado no Dockerfile
+
     cmd = [
         "llama-server",
         "-m", local_model_path,
         "--port", "11434",
-        "-c", "2048",            # Contexto
-        "--alias", "vllmModel"   # No C++, o argumento é puramente --alias
+        "-c", "2048",  # Contexto de avaliação
+        "--alias", "vllmModel"
     ]
-    
-    # Controle de GPU no executável nativo
+
     if has_gpu:
         print(f"🚀 Subindo Llama-Server (C++) para: {identifier} [Modo: GPU (Full Offload)]")
-        cmd += ["-ngl", "999"]   # Joga todas as camadas para a placa de vídeo
+        cmd += ["-ngl", "999"]
     else:
         print(f"🚀 Subindo Llama-Server (C++) para: {identifier} [Modo: CPU Nativo]")
         cmd += ["-ngl", "0"]
-    
+
+    # 📂 Gerenciamento Centralizado de Logs
+    logs_dir = "/app/artifacts/llamacpp_logs"
+    os.makedirs(logs_dir, exist_ok=True)
+
+    # Cria um nome de arquivo limpo e seguro
     safe_name = identifier.replace('/', '_').replace('.', '_')
-    log_file_path = f"/app/artifacts/llamacpp_{safe_name}_debug.log"
+    log_file_path = os.path.join(logs_dir, f"{safe_name}.log")
+
     log_file = open(log_file_path, "w")
     env = os.environ.copy()
     env["LD_LIBRARY_PATH"] = "/usr/local/lib:" + env.get("LD_LIBRARY_PATH", "")
-    # Subimos o processo nativo
+
+    # Dispara o binário nativo salvando a saída na pasta de logs
     process = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, env=env)
-    
+
     time.sleep(5)
-    
-    # 🧠 Warmup (Aguardando o Llama-Server ficar online)
+
+    # 🧠 Warmup Check
     warmup_url = "http://localhost:11434/v1/chat/completions"
     payload = {
         "model": "vllmModel",
         "messages": [{"role": "user", "content": "hi"}]
     }
-    print("Enviando requisição de.")
+
+    print(f"🔄 Aguardando inicialização do backend para {identifier}...")
     max_retries = 20
     for i in range(max_retries):
+        # Se o processo crashou internamente (GGUF corrompido, erro de VRAM, etc)
         if process.poll() is not None:
-            print("❌ O Llama-Server C++ nativo crashou durante a inicialização.")
+            print(f"❌ O Llama-Server crashou de imediato. Verifique os detalhes em: {log_file_path}")
             log_file.close()
             return None
-            
+
         try:
-            # Envia a requisição; se o binário carregou a VRAM, ele responde 200 na hora.
             response = requests.post(warmup_url, json=payload, timeout=15)
-            print(response)
-            print(response.status_code)
             if response.status_code == 200:
-                print("🟢 Llama-Server nativo online, com memória alocada e pronto para a Unity!")
+                print("🟢 Llama-Server nativo online e integrado com sucesso!")
                 log_file.close()
                 return process
-        except e:
-            print(f"⏳ Aguardando alocação de memória no C++... ({i+1}/{max_retries}) Excecao:{e}")
-        
+        except Exception as e:
+            # Corrigido de 'except e:' para tratamento genérico válido do Python
+            print(f"⏳ Alocando tensores e estruturas... ({i + 1}/{max_retries})")
+
         time.sleep(10)
-        
-    print("❌ Timeout: O modelo demorou demais para inicializar.")
+
+    print(f"❌ Timeout: O Llama-Server congelou ou demorou demais para responder.")
     process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+
     log_file.close()
     return None
 
