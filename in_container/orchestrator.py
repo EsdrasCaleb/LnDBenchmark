@@ -426,6 +426,9 @@ def main():
             engine_process = run_llamacpp(local_path, model_identifier)
                 
             if engine_process is None:
+                print(f"❌ Adicionando {model_identifier} à Blacklist por não iniciar")
+                with open(blacklist_path, "a") as f:
+                    f.write(f"{model_identifier}\n")
                 continue
 
             pipeline_success = run_unity_pipeline(model_safe, model_dir, args.backend)
