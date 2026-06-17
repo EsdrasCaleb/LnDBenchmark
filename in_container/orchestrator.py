@@ -12,17 +12,8 @@ import pynvml
 import csv
 import threading
 from datetime import datetime, timedelta, timezone
-from utils import kill_zombie_servers, ResourceMonitor, parse_test_results, clear_leftover_tests, move_generated_tests
+from utils import kill_zombie_servers, ResourceMonitor, parse_test_results, clear_leftover_tests, move_generated_tests,parse_unity_coverage_detailed
 
-# Função placeholder para manter compatibilidade com seu script original
-def parse_unity_coverage_detailed(summary_xml_path):
-    """Retorna um dicionário padrão caso falte no utils."""
-    return {
-        "lines_coverable": 0,
-        "lines_covered": 0,
-        "methods_total": 0,
-        "methods_covered": 0
-    }
 
 def generate_global_leaderboard(models_root_dir, backend_name):
     """Cria o ranking unificado de todos os modelos processados."""
