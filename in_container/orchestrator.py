@@ -84,6 +84,7 @@ def clear_leftover_tests():
 def move_generated_tests(env_var_name, destination_subfolder, model_dir):
     """Auxiliar para mover arquivos gerados liberando espaço mantendo os .asmdef."""
     folder_path = os.environ.get(env_var_name)
+    folder_path = folder_path.replace('"', '').replace("'", "").strip()
     if not folder_path:
         return
     if not os.path.isabs(folder_path):
@@ -334,6 +335,7 @@ def get_best_code_models(limit=5, completed_models=None):
 
 def run_vllm(model_name):
     """Inicia o servidor vLLM de forma pública."""
+    kill_zombie_servers("11434")
     has_gpu = os.environ.get("HAS_GPU", "false").lower() == "true"
     
     cmd = [
@@ -341,11 +343,12 @@ def run_vllm(model_name):
         "--model", model_name,
         "--port", "11434",
         "--max-model-len", "2048",
-        "--served-model-name", "vllm-model",
+        "--served-model-name", "vllmModel",
         "--trust-remote-code"
     ]
     
     run_env = os.environ.copy()
+    
     safe_name = model_name.replace('/', '_')
     log_file_path = f"/app/artifacts/vllm_{safe_name}_debug.log"
     log_file = open(log_file_path, "w")
@@ -385,6 +388,16 @@ def run_vllm(model_name):
             return None
         time.sleep(5)
 
+def kill_zombie_servers(port="11434"):
+    """Força a liberação da porta matando qualquer processo preso nela."""
+    try:
+        # Comando de SO para matar processos segurando a porta
+        subprocess.run(f"fuser -k {port}/tcp", shell=True, check=False, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL, capture_output=True)
+        time.sleep(3) # Dá tempo para o sistema operacional liberar o socket
+    except Exception:
+        print(Exception)
+        pass
+
 # =====================================================================
 # 🦙 BACKEND 2: LLAMA.CPP (MODELOS GGUF QUANTISED)
 # =====================================================================
@@ -418,7 +431,7 @@ def get_best_gguf_models(limit=5, completed_models=None):
         for sibling in detailed_info.siblings:
             filename = sibling.rfilename
             if filename.endswith(".gguf"):
-                if any(part in filename.lower() for part in ["split", "-of-", "part"]):
+                if any(part in filename.lower() for part in ["split", "-of-", "part", "mmproj"]):
                     continue
                 size_bytes = getattr(sibling, 'size', 0) or 0
                 size_gb = size_bytes / (1024 ** 3)
@@ -449,59 +462,68 @@ def get_best_gguf_models(limit=5, completed_models=None):
     return filtered_models
 
 def run_llamacpp(local_model_path, identifier):
-    """Inicia o servidor e aguarda o aquecimento real do modelo."""
+    kill_zombie_servers("11434")
+    """Inicia o servidor binário C++ nativo do Llama.cpp."""
     has_gpu = os.environ.get("HAS_GPU", "false").lower() == "true"
     
-    run_env = os.environ.copy()
-    run_env["LAMA_CPP_MODEL"] = local_model_path
-    run_env["LAMA_CPP_PORT"] = "11434"
-    run_env["LAMA_CPP_MODEL_ALIAS"] = "vllm-model" # ✅ Configuração via Env
-    run_env["LAMA_CPP_API_KEYS"] = ""             # ✅ API Key desativada via Env
-    run_env["LAMA_CPP_N_CTX"] = "2048"
-    run_env["LAMA_CPP_N_GPU_LAYERS"] = "-1" if has_gpu else "0"
-
-    # Comando simplificado (sem os argumentos --model-alias, etc)
+    # Chamada direta para o executável compilado no Dockerfile
     cmd = [
-        "python3", "-u", "-m", "llama_cpp.server"
+        "llama-server",
+        "-m", local_model_path,
+        "--port", "11434",
+        "-c", "2048",            # Contexto
+        "--alias", "vllmModel"   # No C++, o argumento é puramente --alias
     ]
+    
+    # Controle de GPU no executável nativo
+    if has_gpu:
+        print(f"🚀 Subindo Llama-Server (C++) para: {identifier} [Modo: GPU (Full Offload)]")
+        cmd += ["-ngl", "999"]   # Joga todas as camadas para a placa de vídeo
+    else:
+        print(f"🚀 Subindo Llama-Server (C++) para: {identifier} [Modo: CPU Nativo]")
+        cmd += ["-ngl", "0"]
     
     safe_name = identifier.replace('/', '_').replace('.', '_')
     log_file_path = f"/app/artifacts/llamacpp_{safe_name}_debug.log"
     log_file = open(log_file_path, "w")
+    env = os.environ.copy()
+    env["LD_LIBRARY_PATH"] = "/usr/local/lib:" + env.get("LD_LIBRARY_PATH", "")
+    # Subimos o processo nativo
+    process = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, env=env)
     
-    process = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, env=run_env)
+    time.sleep(5)
     
-    # 🏁 AGUARDE O AQUECIMENTO
-    print(f"🚀 Subindo Llama.cpp para: {identifier}...")
-    
-    # Pequeno tempo fixo para subir o processo
-    time.sleep(10)
-    
-    # 🧠 TESTE DE AQUECIMENTO (Warmup)
-    # Enviamos uma requisição mínima de teste
+    # 🧠 Warmup (Aguardando o Llama-Server ficar online)
     warmup_url = "http://localhost:11434/v1/chat/completions"
     payload = {
-        "model": "vllm-model",
+        "model": "vllmModel",
         "messages": [{"role": "user", "content": "hi"}]
     }
     
-    max_retries = 15
+    max_retries = 20
     for i in range(max_retries):
+        if process.poll() is not None:
+            print("❌ O Llama-Server C++ nativo crashou durante a inicialização.")
+            log_file.close()
+            return None
+            
         try:
-            # Fazemos o request real. Se o modelo não estiver pronto, ele falha.
-            response = requests.post(warmup_url, json=payload, timeout=10)
+            # Envia a requisição; se o binário carregou a VRAM, ele responde 200 na hora.
+            response = requests.post(warmup_url, json=payload, timeout=15)
             if response.status_code == 200:
-                print("🟢 Modelo aquecido e respondendo corretamente!")
+                print("🟢 Llama-Server nativo online, com memória alocada e pronto para a Unity!")
+                log_file.close()
                 return process
-            else:
-                print(f"⏳ Aguardando modelo... (Status atual: {response.status_code})")
-        except:
-            print(f"⏳ Servidor iniciando... ({i+1}/{max_retries})")
+        except e:
+            print(f"⏳ Aguardando alocação de memória no C++... ({i+1}/{max_retries}) Excecao:{e}")
         
-        time.sleep(10) # Espera 10s entre tentativas
+        time.sleep(10)
         
+    print("❌ Timeout: O modelo demorou demais para inicializar.")
     process.terminate()
+    log_file.close()
     return None
+
 # =====================================================================
 # ⚙️ MÓDULO ORQUESTRADOR CENTRAL (MAIN)
 # =====================================================================

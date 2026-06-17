@@ -1,5 +1,5 @@
 # 1. Base robusta com CUDA e vLLM já configurados
-FROM vllm/vllm-openai:latest
+FROM vllm/vllm-openai:v0.6.3
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -8,6 +8,7 @@ ENV PATH="/usr/local/cuda/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
 
 # 2. Instala dependências da Unity, do Monitor, do Chromium (CEF), Git e ferramentas para compilar o Llama.cpp
+# (Lista duplicada foi limpa)
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
@@ -41,19 +42,24 @@ RUN apt-get update && apt-get install -y \
     libsecret-1-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Instala bibliotecas auxiliares do Python
-RUN pip3 install huggingface_hub pandas requests
-
-# 🔥 2b. Instalação e Compilação do Llama.cpp com suporte a GPU/CPU integrado
-ENV GGML_CUDA=on
-RUN pip3 install --no-cache-dir llama-cpp-python[server]
-
-# 3. Instalação da Unity utilizando o Changeset correto (b58023a2b463)
+# Instalação da Unity utilizando o Changeset correto (b58023a2b463)
 RUN mkdir -p /tmp/unity-download \
     && curl -fSL -o /tmp/unity-download/unity.tar.xz https://download.unity3d.com/download_unity/3000ef702840/LinuxEditorInstaller/Unity-6000.3.11f1.tar.xz \
     && mkdir -p /opt/Unity \
     && tar -xJf /tmp/unity-download/unity.tar.xz -C /opt/Unity --strip-components=1 \
     && rm -rf /tmp/unity-download
+
+# 🔥 2c. Baixa o binário oficial Vulkan e instala corretamente
+RUN wget "https://github.com/ggml-org/llama.cpp/releases/download/b9673/llama-b9673-bin-ubuntu-vulkan-x64.tar.gz" -O llama.tar.gz \
+    && mkdir -p /opt/llama \
+    && tar -xzf llama.tar.gz -C /opt/llama \
+    && find /opt/llama -type f -executable -exec cp {} /usr/local/bin/ \; \
+    && find /opt/llama -type f -name "*.so*" -exec cp {} /usr/local/lib/ \; \
+    && ldconfig \
+    && rm -rf llama.tar.gz /opt/llama
+
+# Instala bibliotecas auxiliares do Python
+RUN pip3 install huggingface_hub pandas requests
 
 ENV PATH="/opt/Unity:${PATH}"
 ENV HF_HOME="/tmp/huggingface"
