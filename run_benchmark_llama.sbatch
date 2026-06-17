@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --partition=gpu-4-a100,gpu-8-v100,gpu-4-h200
 #SBATCH --time=12:00:00         
-#SBATCH --mem=32G          
+#SBATCH --mem=12G
 #SBATCH --gres=gpu:1            
 
 ARTIFACTS_DIR="unity_artifacts"
@@ -74,6 +74,6 @@ singularity exec --nv --writable-tmpfs \
   --bind "$ARTIFACTS_DIR":/app/artifacts \
   --bind ./in_container/pipelineLlama.sh:/app/pipelineLlama.sh \
   --bind ./in_container/orchestratorLlama.py:/app/orchestratorLlama.py \
-  "$SCRATCH_DIR/unity-vllm-bench.sif" /app/pipelineLlama.sh
+  "$SCRATCH_DIR/unity-vllm-bench.sif" /app/pipelin.sh llamacpp
 
 echo "✅ Bloco de execução finalizado com sucesso!"

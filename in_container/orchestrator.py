@@ -8,6 +8,75 @@ import shutil
 import pandas as pd
 from huggingface_hub import HfApi, hf_hub_download
 import xml.etree.ElementTree as ET
+import psutil
+import pynvml
+import csv
+import time
+import threading
+import os
+
+# Inicializa NVML (GPU) uma vez
+try:
+    pynvml.nvmlInit()
+except:
+    pass
+
+
+class ResourceMonitor:
+    def __init__(self, model_name, output_file):
+        self.model_name = model_name
+        self.output_file = output_file
+        self.running = False
+        self.thread = None
+
+    def _collect(self):
+        # Coleta dados
+        mem = psutil.virtual_memory()
+        cpu_percent = psutil.cpu_percent()
+
+        gpu_data = {"util": 0, "mem_used": 0, "mem_total": 0, "mem_percent": 0}
+        try:
+            handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+            util = pynvml.nvmlDeviceGetUtilizationRates(handle)
+            mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+            gpu_data = {
+                "util": util.gpu,
+                "mem_used": mem_info.used // (1024 ** 2),
+                "mem_total": mem_info.total // (1024 ** 2),
+                "mem_percent": (mem_info.used / mem_info.total) * 100
+            }
+        except:
+            pass
+
+        # Grava no CSV (Append)
+        file_exists = os.path.isfile(self.output_file)
+        with open(self.output_file, 'a', newline='') as f:
+            writer = csv.writer(f)
+            if not file_exists:
+                writer.writerow(["timestamp", "model", "ram_used_mb", "ram_total_mb", "ram_pct", "cpu_pct", "gpu_pct",
+                                 "gpu_mem_used_mb", "gpu_mem_total_mb", "gpu_mem_pct"])
+
+            writer.writerow([
+                time.strftime('%Y-%m-%d %H:%M:%S'), self.model_name,
+                mem.used // (1024 ** 2), mem.total // (1024 ** 2), mem.percent,
+                cpu_percent, gpu_data["util"], gpu_data["mem_used"],
+                gpu_data["mem_total"], round(gpu_data["mem_percent"], 2)
+            ])
+
+    def start(self):
+        self.running = True
+        self.thread = threading.Thread(target=self._run)
+        self.thread.start()
+
+    def _run(self):
+        while self.running:
+            self._collect()
+            time.sleep(2)  # Intervalo de 2s entre coletas
+
+    def stop(self):
+        self.running = False
+        self.thread.join()
+
 
 # =====================================================================
 # 📊 FUNÇÕES COMPARTILHADAS DE PARSING E LIMPEZA
@@ -154,14 +223,23 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
     
     # 🚨 LIMPEZA EXECUTADA ANTES DA GENERATION CLI
     clear_leftover_tests()
-    
+
     print(f"🛠️  [Unity] Executando geração de casos de teste via {backend_name.upper()}...")
-    subprocess.run([
-        "/opt/Unity/Unity", "-projectPath", project_path, "-batchmode", "-nographics",
-        "-executeMethod", "LaundryNDishes.CLI.LndCommandLineInterface.GenerateTestsFolder",
-        "-folder", script_path, "-csv", f"{model_dir}/testGeneration.csv",
-        "-logFile", f"{model_dir}/generation-cli-log.txt"
-    ], check=False)
+    monitor = ResourceMonitor(model_name=model_name, output_file="/app/artifacts/performance_report.csv")
+
+    print(f"🛠️ [Unity] Iniciando geração e monitoramento: {model_name}")
+    monitor.start()
+
+    try:
+        subprocess.run([
+            "/opt/Unity/Unity", "-projectPath", project_path, "-batchmode", "-nographics",
+            "-executeMethod", "LaundryNDishes.CLI.LndCommandLineInterface.GenerateTestsFolder",
+            "-folder", script_path, "-csv", f"{model_dir}/testGeneration.csv",
+            "-logFile", f"{model_dir}/generation-cli-log.txt"
+        ], check=False)
+    finally:
+        monitor.stop()  # Garante que para mesmo se a Unity crashar
+        print(f"✅ Monitoramento finalizado para {model_name}.")
 
     gen_csv_path = os.path.join(model_dir, "testGeneration.csv")
     has_success = False
@@ -303,7 +381,9 @@ def get_best_code_models(limit=5, completed_models=None):
 
         try:
             detailed_info = api.model_info(model.modelId, files_metadata=True)
-        except Exception:
+        except Exception as e:
+            print("Erro ao obter modelo:"+ e)
+
             continue
 
         pipeline = getattr(detailed_info, 'pipeline_tag', '').lower()
@@ -361,18 +441,18 @@ def run_vllm(model_name):
     """Inicia o servidor vLLM de forma pública."""
     kill_zombie_servers("11434")
     has_gpu = os.environ.get("HAS_GPU", "false").lower() == "true"
-    
+
     cmd = [
         "python3", "-u", "-m", "vllm.entrypoints.openai.api_server",
         "--model", model_name,
         "--port", "11434",
-        "--gpu-memory-utilization", "0.85", # Reduzido um pouco mais para dar folga ao PyTorch
-        "--max-model-len", "4096",
+        "--gpu-memory-utilization", "0.75",  # 🛑 REDUÇÃO AGRESSIVA: De 90% para 75%
+        "--max-model-len", "2048",  # 🛑 REDUÇÃO AGRESSIVA: De 4096 para 2048
+        "--dtype", "float16",  # 🛑 FORÇAR FP16: Evita conflito com bfloat16
         "--served-model-name", "vllmModel",
         "--trust-remote-code",
-        "--dtype", "half",                  # Força FP16. "auto" às vezes tenta rodar em BF16 em GPUs não suportadas e crasha
-        "--enforce-eager",                  # 🔥 SALVA-VIDAS: Desliga CUDA Graphs, poupando MUITA memória RAM e SHM
-        "--disable-custom-all-reduce"
+        "--enforce-eager",  # Mantém isso para evitar CUDA Graphs
+        "--disable-custom-all-reduce"  # Mantém isso para evitar problemas de rede interna
     ]
     
     run_env = os.environ.copy()
@@ -418,39 +498,30 @@ def run_vllm(model_name):
 
 
 def kill_zombie_servers(port="11434"):
-    """Força a liberação da porta e aguarda ativamente até que ela esteja livre."""
-    print(f"🧹 [Limpeza] Garantindo que a porta {port} esteja livre...")
+    """Limpeza cirúrgica de processos usando psutil."""
+    print(f"🧹 [Limpeza] Iniciando faxina com psutil...")
 
-    # 1. Tenta matar os processos usando a porta de forma nativa
-    # Funciona para vLLM (Python) e Llama.cpp (binário/python)
-    os.system(f"fuser -k {port}/tcp >/dev/null 2>&1")
-    os.system(f"pkill -f vllm.entrypoints >/dev/null 2>&1")  # Garante contra o vLLM
-    os.system(f"pkill -f llama_cpp >/dev/null 2>&1")  # Garante contra o Llama.cpp
+    # Lista de nomes de processos que queremos matar
+    targets = ["vllm", "llama-server", "server", "python"]
 
-    # 2. Loop de verificação ativa (Wait)
-    # Aguarda até 30 segundos para a porta fechar completamente no SO
-    max_checks = 15
-    port_free = False
+    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        try:
+            cmdline = " ".join(proc.info['cmdline'] or [])
+            # Mata se for um processo vLLM ou Llama.cpp que está na porta 11434
+            if any(t in cmdline.lower() for t in targets) and str(port) in cmdline:
+                print(f"💀 Matando zumbi: {proc.info['name']} (PID: {proc.info['pid']})")
+                proc.terminate()  # Envia SIGTERM primeiro
+                proc.wait(timeout=3)  # Espera 3s para morrer
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired):
+            continue
 
-    for i in range(max_checks):
-        # fuser retorna código de saída 0 se achar alguém usando a porta,
-        # ou maior que 0 se a porta estiver completamente vazia.
-        exit_code = os.system(f"fuser {port}/tcp >/dev/null 2>&1")
-
-        if exit_code != 0:
-            port_free = True
-            break
-
-        print(f"⏳ Porta {port} ainda ocupada ou limpando VRAM... Aguardando 2s (Tentativa {i + 1}/{max_checks})")
-        time.sleep(2)
-
-    if port_free:
-        print(f"🟢 Excelente! Porta {port} totalmente liberada.")
-    else:
-        print(f"⚠️ Alerta: A porta {port} não liberou no tempo esperado, tentando prosseguir mesmo assim.")
-
-    # Uma folga extra para o driver da GPU (CUDA Context) resetar
-    time.sleep(3)
+    # Loop de verificação de porta mantido como segurança extra
+    for _ in range(10):
+        if os.system(f"fuser {port}/tcp >/dev/null 2>&1") != 0:
+            print(f"🟢 Porta {port} livre.")
+            return True
+        time.sleep(1)
+    return False
 
 # =====================================================================
 # 🦙 BACKEND 2: LLAMA.CPP (MODELOS GGUF QUANTISED)

@@ -59,7 +59,7 @@ RUN wget "https://github.com/ggml-org/llama.cpp/releases/download/b9673/llama-b9
     && rm -rf llama.tar.gz /opt/llama
 
 # Instala bibliotecas auxiliares do Python
-RUN pip3 install huggingface_hub pandas requests
+RUN pip3 install huggingface_hub pandas requests psutil nvidia-ml-py
 
 ENV PATH="/opt/Unity:${PATH}"
 ENV HF_HOME="/tmp/huggingface"
