@@ -320,14 +320,22 @@ def get_best_code_models(limit=5, completed_models=None):
         if any(bad in tags_lower for bad in bad_formats):
             continue
 
-        total_size_bytes = 0
+        safetensors_size = 0
+        bin_size = 0
         has_weights = False
+
         for sibling in detailed_info.siblings:
-            # vLLM prefere safetensors (recomendado) ou bin/pt.
-            if sibling.rfilename.endswith(('.safetensors', '.bin', '.pt')):
+            rfile = sibling.rfilename.lower()
+            if rfile.endswith('.safetensors'):
                 has_weights = True
                 if hasattr(sibling, 'size') and sibling.size is not None:
-                    total_size_bytes += sibling.size
+                    safetensors_size += sibling.size
+            elif rfile.endswith(('.bin', '.pt')):
+                has_weights = True
+                if hasattr(sibling, 'size') and sibling.size is not None:
+                    bin_size += sibling.size
+
+        total_size_bytes = safetensors_size if safetensors_size > 0 else bin_size
 
         size_gb = total_size_bytes / (1024 ** 3)
         is_small_by_params = False
@@ -359,11 +367,13 @@ def run_vllm(model_name):
         "python3", "-u", "-m", "vllm.entrypoints.openai.api_server",
         "--model", model_name,
         "--port", "11434",
-        "--gpu-memory-utilization", "0.90",
+        "--gpu-memory-utilization", "0.85", # Reduzido um pouco mais para dar folga ao PyTorch
         "--max-model-len", "4096",
         "--served-model-name", "vllmModel",
         "--trust-remote-code",
-        "--dtype", "auto"
+        "--dtype", "half",                  # Força FP16. "auto" às vezes tenta rodar em BF16 em GPUs não suportadas e crasha
+        "--enforce-eager",                  # 🔥 SALVA-VIDAS: Desliga CUDA Graphs, poupando MUITA memória RAM e SHM
+        "--disable-custom-all-reduce"
     ]
     
     run_env = os.environ.copy()
