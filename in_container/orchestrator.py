@@ -348,7 +348,7 @@ def run_llamacpp(local_model_path, identifier):
                 return process
         except Exception as e:
             # Corrigido de 'except e:' para tratamento genérico válido do Python
-            print(f"⏳ Alocando tensores e estruturas... ({i + 1}/{max_retries})")
+            print(f"⏳ Alocando tensores e estruturas... ({i + 1}/{max_retries}) Error : {e}")
 
         time.sleep(10)
 
