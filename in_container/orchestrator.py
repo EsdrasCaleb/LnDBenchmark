@@ -272,14 +272,14 @@ def get_best_gguf_models(limit=5, completed_models=None):
 
 
 def run_llamacpp(local_model_path, identifier):
-    kill_zombie_servers("11434")
+    kill_zombie_servers("58291")
     """Inicia o servidor binário C++ nativo do Llama.cpp."""
     has_gpu = os.environ.get("HAS_GPU", "false").lower() == "true"
 
     cmd = [
         "llama-server",
         "-m", local_model_path,
-        "--port", "11434",
+        "--port", "58291",
         "-c", "2048",  
         "--alias", "vllmModel"
     ]
@@ -306,7 +306,7 @@ def run_llamacpp(local_model_path, identifier):
 
     time.sleep(5)
 
-    warmup_url = "http://localhost:11434/v1/chat/completions"
+    warmup_url = "http://localhost:58291/v1/chat/completions"
     payload = {
         "model": "vllmModel",
         "messages": [{"role": "user", "content": "hi"}]
