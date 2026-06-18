@@ -400,11 +400,7 @@ def main():
         if model_identifier in completed_models:
             continue
 
-        model_dir = os.path.join(models_root_dir, model_safe)
-        os.makedirs(model_dir, exist_ok=True)
         
-        with open(tmp_model_file, "w") as f:
-            f.write(model_identifier)
             
         local_path = None
         engine_process = None
@@ -423,7 +419,11 @@ def main():
                 with open(blacklist_path, "a") as f:
                     f.write(f"{model_identifier}\n")
                 continue
-
+            model_dir = os.path.join(models_root_dir, model_safe)
+            os.makedirs(model_dir, exist_ok=True)
+            
+            with open(tmp_model_file, "w") as f:
+            f.write(model_identifier)
             pipeline_success = run_unity_pipeline(model_safe, model_dir, args.backend)
             
             if not pipeline_success:

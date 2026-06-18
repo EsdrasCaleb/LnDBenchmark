@@ -80,6 +80,7 @@ RUN wget \
 WORKDIR /app
 
 # Scripts da aplicação
+COPY in_container/orchestrator.py /app/orchestrator.py
 COPY in_container/parse_results.py /app/parse_results.py
 COPY in_container/utils.py /app/utils.py
 COPY in_container/pipeline.sh /app/pipeline.sh
