@@ -86,7 +86,13 @@ From: nvidia/cuda:12.6.3-devel-ubuntu22.04
     # 1. Configura as flags e define ONDE a instalação final deve ser guardada
     mkdir build
     cd build
-    cmake .. -DGGML_CUDA=ON -DCMAKE_INSTALL_PREFIX=/opt/llama-binaries
+    cmake .. \
+        -DGGML_CUDA=ON \
+        -DCMAKE_INSTALL_PREFIX=/opt/llama-binaries \
+        -DCMAKE_C_FLAGS="-march=x86-64-v3 -O3" \
+        -DCMAKE_CXX_FLAGS="-march=x86-64-v3 -O3" \
+        -DCMAKE_CUDA_ARCHITECTURES="70;80;90" \
+        -DGGML_CUDA_F16=ON
 
     # 2. Compila usando todos os núcleos disponíveis
     cmake --build . --config Release -j$(nproc)
