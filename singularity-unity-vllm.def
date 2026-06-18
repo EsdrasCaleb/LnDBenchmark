@@ -1,14 +1,14 @@
 Bootstrap: docker
-From: debian:bookworm-slim
+From: nvidia/cuda:12.6.3-devel-ubuntu22.04
 
 %environment
     export DEBIAN_FRONTEND=noninteractive
     export VIRTUAL_ENV=/opt/venv
     export PATH="/opt/venv/bin:/opt/Unity:${PATH}"
-    export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
+    # Garante que o container encontre as bibliotecas do CUDA e do llama.cpp
+    export LD_LIBRARY_PATH="/usr/local/cuda/lib64:/usr/local/lib:${LD_LIBRARY_PATH}"
     export HF_HOME="/tmp/huggingface"
     export PYTHONUNBUFFERED=1
-
 
 %files
     /home/caleb/gameprojects/unityprojects/LnDBenchmark/unity_installs/Unity-6000.3.11f1.tar.xz /opt/installers/unity.tar.xz
@@ -20,6 +20,7 @@ From: debian:bookworm-slim
 %post
     export DEBIAN_FRONTEND=noninteractive
 
+    # 1. Atualização de pacotes e dependências (incluindo git, cmake e build-essential)
     apt-get update && apt-get install -y --no-install-recommends \
         python3 \
         python3-pip \
@@ -55,26 +56,18 @@ From: debian:bookworm-slim
         libxkbcommon-x11-0 \
         libsecret-1-0
 
-    rm -rf /var/lib/apt/lists/*
-
-    echo "=== DEBUG ==="
-    ls -lah /opt
-    ls -lah /opt/installers || true
-    # Unity
+    # 2. Extração do Unity
     mkdir -p /opt/Unity
     tar -xJf /opt/installers/unity.tar.xz \
         -C /opt/Unity \
         --strip-components=1
 
     rm -rf /opt/installers
-        rm -f /tmp/unity.tar.xz
+    rm -f /tmp/unity.tar.xz
 
-    # Python venv
+    # 3. Python venv e pacotes necessários
     python3 -m venv /opt/venv
-
-    /opt/venv/bin/pip install --no-cache-dir \
-        --upgrade pip setuptools wheel
-
+    /opt/venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel
     /opt/venv/bin/pip install --no-cache-dir \
         huggingface_hub \
         pandas \
@@ -82,25 +75,34 @@ From: debian:bookworm-slim
         psutil \
         nvidia-ml-py
 
-    # llama.cpp binário Vulkan
-    wget \
-        "https://github.com/ggml-org/llama.cpp/releases/download/b9673/llama-b9673-bin-ubuntu-vulkan-x64.tar.gz" \
-        -O /tmp/llama.tar.gz
+    # 🔥 4. COMPILAÇÃO NATIVA DO LLAMA.CPP COM SUPORTE A CUDA 12
+    echo "========================================================="
+    echo "🔨 Baixando e Compilando llama.cpp nativo com CUDA 12..."
+    echo "========================================================="
+    cd /tmp
+    # Baixa a tag estável equivalente à b9673 que você estava usando
+    git clone --depth 1 --branch b9673 https://github.com/ggml-org/llama.cpp.git
+    cd llama.cpp
 
-    mkdir -p /opt/llama
+    # Configura o CMake para usar CUDA de forma explícita
+    mkdir build
+    cd build
+    cmake .. -DGGML_CUDA=ON
 
-    tar -xzf /tmp/llama.tar.gz -C /opt/llama
+    # Compila usando todos os núcleos disponíveis
+    cmake --build . --config Release -j$(nproc)
 
-    find /opt/llama -type f -executable \
-        -exec cp {} /usr/local/bin/ \;
+    # ✅ Mantém a sua lógica inteligente, mas filtrada apenas para a pasta de binários finais!
+    find bin/ -type f -executable -exec cp {} /usr/local/bin/ \;
 
-    find /opt/llama -type f -name "*.so*" \
-        -exec cp {} /usr/local/lib/ \;
-
+    # Faz o mesmo para as bibliotecas compartilhadas (.so) que o CUDA gera
+    find . -type f -name "*.so*" -exec cp {} /usr/local/lib/ \;
     ldconfig || true
 
-    rm -rf /tmp/llama.tar.gz /opt/llama
+    # Limpeza dos arquivos de build para reduzir o tamanho da imagem final
+    rm -rf /tmp/llama.cpp
 
+    # Limpeza do gerenciador de pacotes
     apt-get clean
     rm -rf /var/lib/apt/lists/*
 
