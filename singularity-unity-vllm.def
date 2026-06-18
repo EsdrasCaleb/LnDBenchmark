@@ -80,26 +80,39 @@ From: nvidia/cuda:12.6.3-devel-ubuntu22.04
     echo "🔨 Baixando e Compilando llama.cpp nativo com CUDA 12..."
     echo "========================================================="
     cd /tmp
-    # Baixa a tag estável equivalente à b9673 que você estava usando
     git clone --depth 1 --branch b9673 https://github.com/ggml-org/llama.cpp.git
     cd llama.cpp
 
-    # Configura o CMake para usar CUDA de forma explícita
+    # 1. Configura as flags e define ONDE a instalação final deve ser guardada
     mkdir build
     cd build
-    cmake .. -DGGML_CUDA=ON
+    cmake .. -DGGML_CUDA=ON -DCMAKE_INSTALL_PREFIX=/opt/llama-binaries
 
-    # Compila usando todos os núcleos disponíveis
+    # 2. Compila usando todos os núcleos disponíveis
     cmake --build . --config Release -j$(nproc)
 
-    # ✅ Mantém a sua lógica inteligente, mas filtrada apenas para a pasta de binários finais!
-    find bin/ -type f -executable -exec cp {} /usr/local/bin/ \;
+    # 3. O comando mágico do CMake que organiza tudo lindo em /opt/llama-binaries
+    echo "📦 Instalando e organizando binários em /opt/llama-binaries..."
+    cmake --install .
 
-    # Faz o mesmo para as bibliotecas compartilhadas (.so) que o CUDA gera
-    find . -type f -name "*.so*" -exec cp {} /usr/local/lib/ \;
+    # 4. Agora sim, copiamos o conteúdo limpo e organizado para as pastas do sistema
+    cp /opt/llama-binaries/bin/* /usr/local/bin/
+
+    # Copia as bibliotecas compartilhadas (.so) se elas existirem
+    if [ -d "/opt/llama-binaries/lib" ]; then
+        cp -r /opt/llama-binaries/lib/* /usr/local/lib/ 2>/dev/null || true
+    fi
+    if [ -d "/opt/llama-binaries/lib64" ]; then
+        cp -r /opt/llama-binaries/lib64/* /usr/local/lib/ 2>/dev/null || true
+    fi
+
     ldconfig || true
 
-    # Limpeza dos arquivos de build para reduzir o tamanho da imagem final
+    # Limpa apenas a sujeira do código-fonte (/tmp)
+    rm -rf /tmp/llama.cpp
+
+    # Agora limpamos apenas a pasta de código-fonte (/tmp/llama.cpp),
+    # mas todos os binários finais gerados estão salvos e isolados em /opt/llama-binaries!
     rm -rf /tmp/llama.cpp
 
     # Limpeza do gerenciador de pacotes
