@@ -318,7 +318,9 @@ def run_llamacpp(local_model_path, identifier):
     warmup_url = "http://localhost:58291/v1/chat/completions"
     payload = {
         "model": "vllmModel",
-        "messages": [{"role": "user", "content": "hi"}]
+        "messages": [{"role": "user", "content": "hi"}],
+        "max_tokens": 1,
+        "temperature": 0.0
     }
 
     print(f"🔄 Aguardando inicialização do backend para {identifier}...")
@@ -330,7 +332,7 @@ def run_llamacpp(local_model_path, identifier):
             return None
 
         try:
-            response = requests.post(warmup_url, json=payload, timeout=15)
+            response = requests.post(warmup_url, json=payload, timeout=30)
             if response.status_code == 200:
                 print("🟢 Llama-Server nativo online e integrado com sucesso!")
                 log_file.close()
