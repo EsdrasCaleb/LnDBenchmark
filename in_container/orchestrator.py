@@ -332,7 +332,7 @@ def run_llamacpp(local_model_path, identifier):
             return None
 
         try:
-            response = requests.post(warmup_url, json=payload, timeout=30)
+            response = requests.post(warmup_url, json=payload, timeout=60)
             if response.status_code == 200:
                 print("🟢 Llama-Server nativo online e integrado com sucesso!")
                 log_file.close()
@@ -341,7 +341,7 @@ def run_llamacpp(local_model_path, identifier):
             # Renomeado para 'err' evitando colisões locais de escopo no interpretador
             print(f"⏳ Alocando tensores... ({i + 1}/{max_retries}) Status: Aguardando resposta do Servidor C++")
 
-        time.sleep(10)
+        time.sleep(2)
 
     print(f"❌ Timeout: O Llama-Server congelou ou demorou demais para responder.")
     process.terminate()
