@@ -421,9 +421,9 @@ def main():
                 continue
             model_dir = os.path.join(models_root_dir, model_safe)
             os.makedirs(model_dir, exist_ok=True)
-            
+
             with open(tmp_model_file, "w") as f:
-            f.write(model_identifier)
+                f.write(model_identifier)
             pipeline_success = run_unity_pipeline(model_safe, model_dir, args.backend)
             
             if not pipeline_success:
