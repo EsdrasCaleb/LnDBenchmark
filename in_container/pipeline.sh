@@ -2,8 +2,7 @@
 
 # Garante que o script pare imediatamente se algum comando falhar criticamente
 set -e
-#temporario
-pip install psutil nvidia-ml-py
+
 
 COVERAGE_DIR="/app/artifacts/coverage"
 

@@ -70,13 +70,21 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
     print(f"🛠️ [Unity] Iniciando geração e monitoramento: {model_safe_name}")
     monitor.start()
 
+    # 1. Extrai os argumentos para uma variável estruturada
+    cmd_args = [
+        "/opt/Unity/Unity", "-projectPath", project_path, "-batchmode", "-nographics",
+        "-executeMethod", "LaundryNDishes.CLI.LndCommandLineInterface.GenerateTestsFolder",
+        "-folder", script_path, "-csv", f"{model_dir}/testGeneration.csv",
+        "-logFile", f"{model_dir}/generation-cli-log.txt"
+    ]
+
     try:
-        subprocess.run([
-            "/opt/Unity/Unity", "-projectPath", project_path, "-batchmode", "-nographics",
-            "-executeMethod", "LaundryNDishes.CLI.LndCommandLineInterface.GenerateTestsFolder",
-            "-folder", script_path, "-csv", f"{model_dir}/testGeneration.csv",
-            "-logFile", f"{model_dir}/generation-cli-log.txt"
-        ], check=False)
+        # 2. Exibe os argumentos formatados de forma legível no log de debug
+        print(f"🔹 [Debug] Comando enviado ao subprocess:\n{' '.join(cmd_args)}")
+        
+        # 3. Executa o processo passando a lista de argumentos
+        subprocess.run(cmd_args, check=False)
+
     finally:
         monitor.stop()  
         print(f"✅ Monitoramento finalizado para {model_safe_name}.")
@@ -221,30 +229,31 @@ def get_best_gguf_models(limit=5, completed_models=None):
             if last_modified < um_ano_atras:
                 continue
 
+        pipeline = getattr(model, 'pipeline_tag', '')
+        tags = getattr(model, 'tags', [])
+        tags_lower = [str(t).lower() for t in tags]
+
         try:
-            detailed_info = api.model_info(model.modelId, files_metadata=True)
+            repo_files =  list(api.list_repo_tree(model.modelId, expand=True))
         except Exception:
             continue
 
-        pipeline = getattr(detailed_info, 'pipeline_tag', '')
-        tags = getattr(detailed_info, 'tags', [])
-        tags_lower = [str(t).lower() for t in tags]
-
-        bad_pipelines = ["feature-extraction", "sentence-similarity", "text-classification"]
-        if pipeline in bad_pipelines or any(b in tags_lower for b in bad_pipelines):
-            continue
-
         valid_gguf_files = []
-        for sibling in detailed_info.siblings:
-            filename = sibling.rfilename
-            if filename.endswith(".gguf"):
-                if any(part in filename.lower() for part in ["split", "-of-", "part", "mmproj"]):
+        for item in repo_files:
+            if item.path.endswith(".gguf"):
+                if item.security and item.security.safe is not True  and item.security.status == "unsafe":
+                    print(f"⚠️ Modelo bloqueado por segurança: {model.modelId} ({item.path})")
                     continue
-                size_bytes = getattr(sibling, 'size', 0) or 0
+
+                # Ignora fragmentos
+                if any(part in item.path.lower() for part in ["split", "-of-", "part", "mmproj"]):
+                    continue
+                
+                size_bytes = getattr(item, 'size', 0) or 0
                 size_gb = size_bytes / (1024 ** 3)
 
                 if 0 < size_gb <= 9.0:
-                    valid_gguf_files.append({"filename": filename, "size_gb": size_gb})
+                    valid_gguf_files.append({"filename": item.path, "size_gb": size_gb})
 
         if not valid_gguf_files:
             continue
