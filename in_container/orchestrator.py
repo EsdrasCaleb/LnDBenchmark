@@ -110,7 +110,7 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
         move_generated_tests("EDITORTEST_FOLDER", "EditorTests", model_dir)
         return False
 
-    #AQUI
+
     test_list_path = os.path.join(model_dir, "testList.csv")
 
     subprocess.run([
@@ -136,7 +136,7 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
         print(f"❌ Erro Crítico: {test_list_path} não foi gerado pela Unity.")
         return False
 
-    #FIM
+
 
     print("🎮 [Unity] Executando EditMode Tests + Code Coverage...")
     subprocess.run([
