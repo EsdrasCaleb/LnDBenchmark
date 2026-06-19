@@ -293,9 +293,10 @@ def main():
     print("🦙 MODO SELECIONADO: PIPELINE LLAMA.CPP (Modelos GGUF compactos)")
     has_gpu = os.environ.get("HAS_GPU", "false").lower() == "true"
     if has_gpu:
-        models_to_test = get_best_gguf_models(limit=200, completed_models=completed_models)
+        #models_to_test = get_best_gguf_models(limit=200, completed_models=completed_models)
+        models_to_test = get_best_gguf_models(limit=0, completed_models=completed_models,days_old=999,model_search="unity",modelt_filter=["gguf"])
     else:
-        models_to_test = get_best_gguf_models(limit=5, completed_models=completed_models)
+        models_to_test = get_best_gguf_models(limit=5, completed_models=completed_models,days_old=999,model_search="unity",modelt_filter=["gguf"])
 
     if not models_to_test:
         print(f"🏁 [CONCLUÍDO] Nenhum modelo restante para processar com o backend {args.backend.upper()}!")

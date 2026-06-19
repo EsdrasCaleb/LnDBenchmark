@@ -357,7 +357,7 @@ def run_vllm(model_name):
         time.sleep(5)
     
 
-def get_best_gguf_models(limit=5, completed_models=None):
+def get_best_gguf_models(limit=5, completed_models=None,intruct_only=False,days_old=365,modelt_filter=["gguf", "text-generation", "code","llama.cpp"],model_search=""):
     if completed_models is None:
         completed_models = set()
 
@@ -372,12 +372,13 @@ def get_best_gguf_models(limit=5, completed_models=None):
     hf_token = os.environ.get("HF_TOKEN")
     api = HfApi(token=hf_token)
 
-    um_ano_atras = datetime.now(timezone.utc) - timedelta(days=365)
+    um_ano_atras = datetime.now(timezone.utc) - timedelta(days=days_old)
 
     print(f"🔍 Buscando os melhores modelos GGUF para CÓDIGO (atualizados após {um_ano_atras.strftime('%Y-%m-%d')})...")
 
     available_models = api.list_models(
-        filter=["gguf", "text-generation", "code","llama.cpp"],
+        filter=modelt_filter,
+        search=model_search,
         sort="trending_score",
         full=True
     )
@@ -396,6 +397,16 @@ def get_best_gguf_models(limit=5, completed_models=None):
         pipeline = getattr(model, 'pipeline_tag', '')
         tags = getattr(model, 'tags', [])
         tags_lower = [str(t).lower() for t in tags]
+
+        eh_instruct_ou_it = (
+            "instruct" in model_id_lower or 
+            "-it" in model_id_lower or 
+            "instruct" in tags_lower or 
+            "it" in tags_lower
+        )
+        
+        if intruct_only and not eh_instruct_ou_it:
+            continue
 
         try:
             repo_files =  list(api.list_repo_tree(model.modelId, expand=True))
