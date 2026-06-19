@@ -357,7 +357,10 @@ def run_vllm(model_name):
         time.sleep(5)
     
 
-def get_best_gguf_models(limit=5, completed_models=None,intruct_only=False,days_old=365,modelt_filter=["gguf", "text-generation", "code","llama.cpp"],model_search=""):
+def get_best_gguf_models(limit=5, completed_models=None,
+                         intruct_only=False,days_old=365,
+                         modelt_filter=["gguf", "text-generation", "code","llama.cpp"],
+                         model_search="", max_size=9.0):
     if completed_models is None:
         completed_models = set()
 
@@ -427,7 +430,7 @@ def get_best_gguf_models(limit=5, completed_models=None,intruct_only=False,days_
                 size_bytes = getattr(item, 'size', 0) or 0
                 size_gb = size_bytes / (1024 ** 3)
 
-                if 0 < size_gb <= 9.0:
+                if 0 < size_gb <= max_size:
                     valid_gguf_files.append({"filename": item.path, "size_gb": size_gb})
 
         if not valid_gguf_files:
