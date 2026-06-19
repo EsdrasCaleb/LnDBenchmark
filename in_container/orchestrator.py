@@ -303,6 +303,7 @@ def main():
         flag_path = os.path.join(artifacts_dir, "NO_MORE_MODELS.flag")
         with open(flag_path, "w") as f:
             f.write("FINISHED")
+        generate_global_leaderboard(models_root_dir, args.backend)
         sys.exit(0)
 
     for target in models_to_test:
