@@ -110,6 +110,34 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
         move_generated_tests("EDITORTEST_FOLDER", "EditorTests", model_dir)
         return False
 
+    #AQUI
+    test_list_path = os.path.join(model_dir, "testList.csv")
+
+    subprocess.run([
+        "/opt/Unity/Unity", "-projectPath", project_path, "-batchmode", "-nographics",
+        "-executeMethod", "LaundryNDishes.CLI.LndCommandLineInterface.ExportTestReport",
+        "-csv", test_list_path,
+        "-logFile", f"{model_dir}/export-cli-log.txt"
+    ], check=False)
+
+    # Valida se o CSV foi gerado e se possui dados além do cabeçalho
+    if os.path.exists(test_list_path):
+        try:
+            test_df = pd.read_csv(test_list_path)
+            if test_df.empty:
+                print(f"🛑 [Unity] O arquivo {test_list_path} contém apenas o header. Parando o pipeline aqui.")
+                move_generated_tests("PLAYTEST_FOLDER", "Play_Test", model_dir)
+                move_generated_tests("EDITORTEST_FOLDER", "EditorTests", model_dir)
+                return False
+        except Exception as e:
+            print(f"⚠️ Erro ao ler {test_list_path}: {e}")
+            return False
+    else:
+        print(f"❌ Erro Crítico: {test_list_path} não foi gerado pela Unity.")
+        return False
+
+    #FIM
+
     print("🎮 [Unity] Executando EditMode Tests + Code Coverage...")
     subprocess.run([
         "/opt/Unity/Unity", "-projectPath", project_path, "-batchmode", "-nographics",
@@ -265,14 +293,13 @@ def run_llamacpp(local_model_path, identifier):
 # =====================================================================
 # ⚙️ MÓDULO ORQUESTRADOR CENTRAL (MAIN)
 # =====================================================================
-
 def main():
     print("DEBUG: Entrou no main do orquestrador.")
     parser = argparse.ArgumentParser(description="Orquestrador Unificado de IA para Testes de Cobertura Unity")
     parser.add_argument(
-        "--backend", 
-        type=str, 
-        choices=["vllm", "llamacpp"], 
+        "--backend",
+        type=str,
+        choices=["vllm", "llamacpp"],
         default="llamacpp",
         help="Selecione o motor de execução (padrão: llamacpp)"
     )
@@ -280,10 +307,17 @@ def main():
 
     artifacts_dir = "/app/artifacts"
     models_root_dir = os.path.join(artifacts_dir, "models")
+    # 📂 Nova pasta para armazenar os modelos que falharam no pipeline
+    models_halsucess_dir = os.path.join(artifacts_dir, "models_halsucess")
+
+    # Garante que as pastas de destino existam
+    os.makedirs(models_root_dir, exist_ok=True)
+    os.makedirs(models_halsucess_dir, exist_ok=True)
+
     tmp_model_file = "/tmp/current_active_model"
     blacklist_path = os.path.join(artifacts_dir, "modelblacklist.txt")
     completed_path = os.path.join(artifacts_dir, "completed_models.txt")
-    
+
     completed_models = set()
     if os.path.exists(completed_path):
         with open(completed_path, "r") as f:
@@ -293,10 +327,12 @@ def main():
     print("🦙 MODO SELECIONADO: PIPELINE LLAMA.CPP (Modelos GGUF compactos)")
     has_gpu = os.environ.get("HAS_GPU", "false").lower() == "true"
     if has_gpu:
-        #models_to_test = get_best_gguf_models(limit=200, completed_models=completed_models)
-        models_to_test = get_best_gguf_models(limit=0, completed_models=completed_models,days_old=999,model_search="unity",modelt_filter=["gguf"],max_size=11)
+        models_to_test = get_best_gguf_models(limit=0, completed_models=completed_models, days_old=999,
+                                              model_search="unity", modelt_filter=["gguf"], max_size=11)
     else:
-        models_to_test = get_best_gguf_models(limit=5, completed_models=completed_models,days_old=999,model_search="unity",modelt_filter=["gguf"])
+        models_to_test = get_best_gguf_models(limit=5, completed_models=completed_models, days_old=999,
+                                              model_search="unity", modelt_filter=["gguf"])
+
 
     if not models_to_test:
         print(f"🏁 [CONCLUÍDO] Nenhum modelo restante para processar com o backend {args.backend.upper()}!")
@@ -313,11 +349,9 @@ def main():
         if model_identifier in completed_models:
             continue
 
-        
-            
         local_path = None
         engine_process = None
-        
+
         try:
             print(f"\n📥 [Llama.cpp] Baixando arquivo GGUF alvo: {target['filename']}...")
             local_path = hf_hub_download(
@@ -326,36 +360,51 @@ def main():
                 token=os.environ.get("HF_TOKEN")
             )
             engine_process = run_llamacpp(local_path, model_identifier)
-                
+
             if engine_process is None:
                 print(f"❌ Adicionando {model_identifier} à Blacklist por não iniciar")
                 with open(blacklist_path, "a") as f:
                     f.write(f"{model_identifier}\n")
                 continue
+
             model_dir = os.path.join(models_root_dir, model_safe)
             os.makedirs(model_dir, exist_ok=True)
 
             with open(tmp_model_file, "w") as f:
                 f.write(model_identifier)
+
             pipeline_success = run_unity_pipeline(model_safe, model_dir, args.backend)
-            
+
             if not pipeline_success:
                 print(f"❌ Adicionando {model_identifier} à Blacklist...")
                 with open(blacklist_path, "a") as f:
                     f.write(f"{model_identifier}\n")
+
+                # 📦 MOVE SE FALHAR: Transfere a pasta de resultados para 'models_halsucess'
+                halsucess_target_dir = os.path.join(models_halsucess_dir, model_safe)
+                shutil.rmtree(halsucess_target_dir, ignore_errors=True)
+
+                if os.path.exists(model_dir):
+                    shutil.move(model_dir, halsucess_target_dir)
+                    print(f"⚠️ Pipeline falhou. Pasta movida para: {halsucess_target_dir}")
             else:
                 print(f"✨ {model_identifier} finalizado com sucesso! Registrando nos concluídos...")
                 with open(completed_path, "a") as f:
                     f.write(f"{model_identifier}\n")
-                    
+
         except Exception as main_err:
             print(f"⚠️ Falha catastrófica no processamento do modelo {model_identifier}: {main_err}")
+            # Garantia de segurança: se estourar erro no meio do caminho, move a pasta mesmo assim
+            halsucess_target_dir = os.path.join(models_halsucess_dir, model_safe)
+            if os.path.exists(os.path.join(models_root_dir, model_safe)):
+                shutil.rmtree(halsucess_target_dir, ignore_errors=True)
+                shutil.move(os.path.join(models_root_dir, model_safe), halsucess_target_dir)
         finally:
             if engine_process:
                 print(f"🛑 Desligando servidor ativo do backend {args.backend.upper()}...")
                 engine_process.terminate()
                 engine_process.wait()
-            
+
             if args.backend == "llamacpp" and local_path and os.path.exists(local_path):
                 print(f"🧹 Liberando espaço em disco: Removendo cache do GGUF {target['filename']}...")
                 try:
@@ -366,7 +415,7 @@ def main():
 
     with open(tmp_model_file, "w") as f:
         f.write("-")
-        
+
     generate_global_leaderboard(models_root_dir, args.backend)
 
 if __name__ == "__main__":
