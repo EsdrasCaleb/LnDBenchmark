@@ -6,6 +6,8 @@ import threading
 import xml.etree.ElementTree as ET
 import psutil
 import pynvml
+from huggingface_hub import HfApi
+from datetime import datetime, timedelta, timezone
 
 # Inicializa NVML (GPU) uma vez
 try:
@@ -353,3 +355,90 @@ def run_vllm(model_name):
             process.terminate()
             return None
         time.sleep(5)
+    
+
+def get_best_gguf_models(limit=5, completed_models=None):
+    if completed_models is None:
+        completed_models = set()
+
+    artifacts_dir = "/app/artifacts"
+    blacklist_path = os.path.join(artifacts_dir, "modelblacklist.txt")
+    blacklist = set()
+
+    if os.path.exists(blacklist_path):
+        with open(blacklist_path, "r") as f:
+            blacklist = {line.strip() for line in f if line.strip()}
+
+    hf_token = os.environ.get("HF_TOKEN")
+    api = HfApi(token=hf_token)
+
+    um_ano_atras = datetime.now(timezone.utc) - timedelta(days=365)
+
+    print(f"🔍 Buscando os melhores modelos GGUF para CÓDIGO (atualizados após {um_ano_atras.strftime('%Y-%m-%d')})...")
+
+    available_models = api.list_models(
+        filter=["gguf", "text-generation", "code","llama.cpp"],
+        sort="trending_score",
+        full=True
+    )
+
+    filtered_models = []
+
+    for model in available_models:
+        model_id_lower = model.modelId.lower()
+        last_modified = getattr(model, 'lastModified', None)
+        if last_modified:
+            if isinstance(last_modified, str):
+                last_modified = datetime.fromisoformat(last_modified.replace('Z', '+00:00'))
+            if last_modified < um_ano_atras:
+                continue
+
+        pipeline = getattr(model, 'pipeline_tag', '')
+        tags = getattr(model, 'tags', [])
+        tags_lower = [str(t).lower() for t in tags]
+
+        try:
+            repo_files =  list(api.list_repo_tree(model.modelId, expand=True))
+        except Exception:
+            continue
+
+        valid_gguf_files = []
+        for item in repo_files:
+            if item.path.endswith(".gguf"):
+                if item.security and item.security.safe is not True  and item.security.status == "unsafe":
+                    print(f"⚠️ Modelo bloqueado por segurança: {model.modelId} ({item.path})")
+                    continue
+
+                # Ignora fragmentos
+                if any(part in item.path.lower() for part in ["split", "-of-", "part", "mmproj"]):
+                    continue
+                
+                size_bytes = getattr(item, 'size', 0) or 0
+                size_gb = size_bytes / (1024 ** 3)
+
+                if 0 < size_gb <= 9.0:
+                    valid_gguf_files.append({"filename": item.path, "size_gb": size_gb})
+
+        if not valid_gguf_files:
+            continue
+
+        valid_gguf_files.sort(key=lambda x: x["size_gb"], reverse=True)
+        chosen_file = valid_gguf_files[0]
+        model_identifier = f"{model.modelId}/{chosen_file['filename']}"
+
+        if model_identifier in blacklist or model_identifier in completed_models:
+            continue
+
+        filtered_models.append({
+            "repo_id": model.modelId,
+            "filename": chosen_file["filename"],
+            "size_gb": chosen_file["size_gb"],
+            "identifier": model_identifier
+        })
+        print(f"✅ Especialista em Código Encontrado: {model_identifier} (~{chosen_file['size_gb']:.2f} GB)")
+
+        if limit and len(filtered_models) >= limit:
+            break
+
+    filtered_models.sort(key=lambda x: x["size_gb"])
+    return filtered_models
