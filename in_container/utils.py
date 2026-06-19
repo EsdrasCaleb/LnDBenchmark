@@ -71,6 +71,15 @@ class ResourceMonitor:
         self.running = False
         self.thread.join()
 
+def kill_unity_ghost_processes():
+    for proc in psutil.process_iter(['name']):
+        try:
+            if proc.info['name'] and "Unity" in proc.info['name']:
+                # Evita matar o orquestrador caso ele tenha Unity no nome por algum motivo
+                if proc.pid != os.getpid():
+                    proc.kill()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
 
 # =====================================================================
 # 📊 FUNÇÕES COMPARTILHADAS DE PARSING E LIMPEZA
@@ -122,6 +131,7 @@ def parse_unity_coverage_detailed(summary_xml_path):
 def clear_leftover_tests():
     """🚨 REQUISITO: Remove arquivos antigos das pastas de testes antes de rodar a Unity, preservando arquivos assembly."""
     print("🧹 Iniciando varredura e limpeza de testes antigos...")
+    kill_unity_ghost_processes()
     for env_var in ["PLAYTEST_FOLDER", "EDITORTEST_FOLDER"]:
         folder_path = os.environ.get(env_var)
         if not folder_path:

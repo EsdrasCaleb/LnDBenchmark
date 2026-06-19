@@ -262,14 +262,17 @@ def run_llamacpp(local_model_path, identifier):
 
     print(f"🔄 Aguardando inicialização do backend para {identifier}...")
     max_retries = 20
+    session = requests.Session()
+
     for i in range(max_retries):
         if process.poll() is not None:
             print(f"❌ O Llama-Server crashou de imediato. Detalhes salvos em: {log_file_path}")
+            process.wait()
             log_file.close()
             return None
 
         try:
-            response = requests.post(warmup_url, json=payload, timeout=60)
+            response = session.post(warmup_url, json=payload, timeout=60)
             if response.status_code == 200:
                 print("🟢 Llama-Server nativo online e integrado com sucesso!")
                 log_file.close()
