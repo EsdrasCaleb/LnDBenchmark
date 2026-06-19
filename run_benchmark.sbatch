@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --partition=gpu-4-a100,gpu-8-v100,gpu-4-h200
 #SBATCH --time=12:00:00         
-#SBATCH --mem=16G
+#SBATCH --mem=32G
 #SBATCH --gres=gpu:1            
 
 ARTIFACTS_DIR="unity_artifacts"

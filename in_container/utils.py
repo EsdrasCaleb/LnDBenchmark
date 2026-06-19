@@ -360,7 +360,7 @@ def run_vllm(model_name):
 def get_best_gguf_models(limit=5, completed_models=None,
                          intruct_only=False,days_old=365,
                          modelt_filter=["gguf", "text-generation", "code","llama.cpp"],
-                         model_search="", max_size=9.0):
+                         model_search="", max_size=8.0):
     if completed_models is None:
         completed_models = set()
 
