@@ -356,12 +356,22 @@ def main():
         engine_process = None
 
         try:
-            print(f"\n📥 [Llama.cpp] Baixando arquivo GGUF alvo: {target['filename']}...")
+            print(f"\n📥 [Llama.cpp] Baixando arquivo GGUF alvo para o SCRATCH: {target['filename']}...")
+
+            # 🎯 Aponta para o caminho que mapeamos no Singularity (--bind)
+            scratch_download_dir = "/app/scratch_models"
+
             local_path = hf_hub_download(
                 repo_id=target["repo_id"],
                 filename=target["filename"],
-                token=os.environ.get("HF_TOKEN")
+                token=os.environ.get("HF_TOKEN"),
+                local_dir=scratch_download_dir,  # 📁 Salva direto no Scratch físico do Cluster
+                local_dir_use_symlinks=False  # 🚫 Não cria atalhos, baixa o arquivo real (.gguf)
             )
+
+            # Print de debug para você monitorar no log se ele está indo para o lugar certo
+            print(f"📍 Arquivo localizado em: {local_path}")
+
             engine_process = run_llamacpp(local_path, model_identifier)
 
             if engine_process is None:

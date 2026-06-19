@@ -68,10 +68,11 @@ echo "========================================================="
 echo "🎮 Executando Container Llama.cpp + Unity com Suporte a GPU"
 echo "========================================================="
 
-# 🌟 Adicionada a flag --writable-tmpfs
-singularity exec --nv --writable-tmpfs \
+# 🌟 Executa o Singularity com o novo --bind apontando para o Scratch
+singularity exec --nv \
   --bind "$PROJECT_PATH":/app/project \
   --bind "$ARTIFACTS_DIR":/app/artifacts \
+  --bind "$SCRATCH_DIR/hf_scratch_download":/app/scratch_models \
   --bind ./in_container/orchestrator.py:/app/orchestrator.py \
   --bind ./in_container/utils.py:/app/utils.py \
   --bind ./in_container/pipeline.sh:/app/pipeline.sh \
