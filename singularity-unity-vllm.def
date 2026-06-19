@@ -75,36 +75,54 @@ From: nvidia/cuda:12.6.3-devel-ubuntu22.04
         psutil \
         nvidia-ml-py
 
-    # 🔥 4. COMPILAÇÃO NATIVA DO LLAMA.CPP COM SUPORTE A CUDA 12
+   # 🔥 4. COMPILAÇÃO NATIVA DO LLAMA.CPP COM SUPORTE A CUDA 12
     echo "========================================================="
-    echo "🔨 Baixando e Compilando llama.cpp nativo com CUDA 12..."
+    echo "🔨 Preparando e Compilando llama.cpp nativo com CUDA 12..."
     echo "========================================================="
-    cd /tmp
-    git clone --depth 1 --branch b9673 https://github.com/ggml-org/llama.cpp.git
-    cd llama.cpp
+    
+    # 🔗 Solução para o Linker: Cria um link simbólico do stub no path padrão do sistema
+    # Isso resolve o erro de dependência oculta da libggml-cuda.so
+    ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/lib/x86_64-linux-gnu/libcuda.so.1
 
-    # 1. Configura as flags e define ONDE a instalação final deve ser guardada
-    mkdir build
+    export LDFLAGS="-L/usr/local/cuda/lib64/stubs -Wl,-rpath-link,/usr/local/cuda/lib64/stubs"
+    export LIBRARY_PATH="/usr/local/cuda/lib64/stubs:${LIBRARY_PATH}"
+
+    cd /tmp
+    if [ -d "llama.cpp" ]; then
+        echo "📂 Diretório existente encontrado. Limpando para recomeçar..."
+        cd llama.cpp
+        git reset --hard
+        git clean -fdx
+        git checkout b9673
+    else
+        echo "📥 Clonando nova cópia do repositório..."
+        git clone --depth 1 --branch b9673 https://github.com/ggml-org/llama.cpp.git
+        cd llama.cpp
+    fi
+
+    rm -rf build && mkdir build
     cd build
+
+    # Adicionado -DCMAKE_EXE_LINKER_FLAGS para embutir o caminho do stub nos binários internos do build
     cmake .. \
         -DGGML_CUDA=ON \
         -DCMAKE_INSTALL_PREFIX=/opt/llama-binaries \
         -DCMAKE_C_FLAGS="-march=x86-64-v3 -O3" \
         -DCMAKE_CXX_FLAGS="-march=x86-64-v3 -O3" \
         -DCMAKE_CUDA_ARCHITECTURES="70;80;90" \
-        -DGGML_CUDA_F16=ON
+        -DGGML_CUDA_F16=ON \
+        -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath-link,/usr/local/cuda/lib64/stubs"
 
-    # 2. Compila usando todos os núcleos disponíveis
+    # Compila usando todos os núcleos da máquina
     cmake --build . --config Release -j$(nproc)
 
-    # 3. O comando mágico do CMake que organiza tudo lindo em /opt/llama-binaries
-    echo "📦 Instalando e organizando binários em /opt/llama-binaries..."
+    # Organiza os arquivos finais na pasta /opt/llama-binaries
+    echo "📦 Instalando binários limpos em /opt/llama-binaries..."
     cmake --install .
 
-    # 4. Agora sim, copiamos o conteúdo limpo e organizado para as pastas do sistema
+    # Copia o conteúdo estruturado para o path global do container
     cp /opt/llama-binaries/bin/* /usr/local/bin/
-
-    # Copia as bibliotecas compartilhadas (.so) se elas existirem
+    
     if [ -d "/opt/llama-binaries/lib" ]; then
         cp -r /opt/llama-binaries/lib/* /usr/local/lib/ 2>/dev/null || true
     fi
@@ -112,13 +130,10 @@ From: nvidia/cuda:12.6.3-devel-ubuntu22.04
         cp -r /opt/llama-binaries/lib64/* /usr/local/lib/ 2>/dev/null || true
     fi
 
+    # 🧼 Limpeza: Remove o link simbólico fake para que no cluster ele use o driver real da GPU
+    rm -f /usr/lib/x86_64-linux-gnu/libcuda.so.1
+
     ldconfig || true
-
-    # Limpa apenas a sujeira do código-fonte (/tmp)
-    rm -rf /tmp/llama.cpp
-
-    # Agora limpamos apenas a pasta de código-fonte (/tmp/llama.cpp),
-    # mas todos os binários finais gerados estão salvos e isolados em /opt/llama-binaries!
     rm -rf /tmp/llama.cpp
 
     # Limpeza do gerenciador de pacotes
