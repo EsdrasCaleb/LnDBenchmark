@@ -332,8 +332,8 @@ def main():
     print("🦙 MODO SELECIONADO: PIPELINE LLAMA.CPP (Modelos GGUF compactos)")
     has_gpu = os.environ.get("HAS_GPU", "false").lower() == "true"
     if has_gpu:
-        # get_best_gguf_models(limit=0,model_search="code",modelt_filter="gguf",max_size=4) 
-        # get_best_gguf_models(limit=7,model_search="code",modelt_filter="gguf",max_size=12)
+        # get_best_gguf_models(limit=0,model_search="code",modelt_filter="gguf",max_size=4,oder_size=False) 
+        # get_best_gguf_models(limit=7,model_search="code",modelt_filter="gguf",max_size=12,oder_size=False)
         models_to_test = get_best_gguf_models(limit=0, completed_models=completed_models, days_old=999,
                                               model_search="unity", modelt_filter=["gguf"], max_size=4.1)
     else:
