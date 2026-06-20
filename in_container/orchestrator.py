@@ -333,7 +333,7 @@ def main():
     has_gpu = os.environ.get("HAS_GPU", "false").lower() == "true"
     if has_gpu:
         models_to_test = get_best_gguf_models(limit=0, completed_models=completed_models, days_old=999,
-                                              model_search="unity", modelt_filter=["gguf"], max_size=11)
+                                              model_search="unity", modelt_filter=["gguf"], max_size=9)
     else:
         models_to_test = get_best_gguf_models(limit=5, completed_models=completed_models, days_old=999,
                                               model_search="unity", modelt_filter=["gguf"])
