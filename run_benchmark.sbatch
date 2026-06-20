@@ -70,7 +70,7 @@ echo "========================================================="
 
 # 🌟 Executa o Singularity com o novo --bind apontando para o Scratch
 singularity exec --nv --writable-tmpfs \
-  --bind "$PROJECT_PATH":/app/project \
+  --bind "$SCRATCH_DIR/unityprojects/BenchMark2RogueLite":/app/project \
   --bind "$ARTIFACTS_DIR":/app/artifacts \
   --bind "$SCRATCH_DIR/hf_scratch_download":/app/scratch_models \
   --bind "$SCRATCH_DIR/container_tmp":/tmp \

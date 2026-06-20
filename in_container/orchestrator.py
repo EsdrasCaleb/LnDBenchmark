@@ -368,7 +368,6 @@ def main():
                 filename=target["filename"],
                 token=os.environ.get("HF_TOKEN"),
                 local_dir=scratch_download_dir,  # 📁 Salva direto no Scratch físico do Cluster
-                local_dir_use_symlinks=False  # 🚫 Não cria atalhos, baixa o arquivo real (.gguf)
             )
 
             # Print de debug para você monitorar no log se ele está indo para o lugar certo
