@@ -74,6 +74,9 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
         "/opt/Unity/Unity", "-projectPath", project_path, "-batchmode", "-nographics",
         "-executeMethod", "LaundryNDishes.CLI.LndCommandLineInterface.GenerateTestsFolder",
         "-folder", script_path, "-csv", f"{model_dir}/testGeneration.csv",
+        "-no-licensing",
+        "-disable-assembly-updater",
+        "-aad",
         "-logFile", f"{model_dir}/generation-cli-log.txt"
     ]
 
@@ -116,9 +119,9 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
     subprocess.run([
         "/opt/Unity/Unity", "-projectPath", project_path, "-batchmode", "-nographics",
         "-executeMethod", "LaundryNDishes.CLI.LndCommandLineInterface.ExportTestReport",
-        "-no-licensing"
-       "-disable-assembly-updater"
-        "-aad"
+        "-no-licensing",
+       "-disable-assembly-updater",
+        "-aad",
         "-csv", test_list_path,
         "-logFile", f"{model_dir}/export-cli-log.txt"
     ], check=False)
@@ -147,9 +150,9 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
         "-testPlatform", "editmode", "-runTests", "-debugCodeOptimization", "-enableCodeCoverage",
         "-coverageResultsPath", coverage_dir,
         "-coverageOptions", f"generateAdditionalMetrics;assemblyFilters:+{asm_name}",
-        "-disable-assembly-updater"
-        "-aad"
-        "-no-licensing"
+        "-disable-assembly-updater",
+        "-aad",
+        "-no-licensing",
         "-testResults", f"{model_dir}/editmode-results.xml",
         "-logFile", f"{model_dir}/editmode-log.txt"
     ], check=False)
@@ -159,9 +162,9 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
         "/opt/Unity/Unity", "-projectPath", project_path, "-batchmode", "-nographics",
         "-testPlatform", "playmode", "-runTests", "-debugCodeOptimization", "-enableCodeCoverage",
         "-coverageResultsPath", coverage_dir,
-        "-disable-assembly-updater"
-        "-aad"
-        "-no-licensing"
+        "-disable-assembly-updater",
+        "-aad",
+        "-no-licensing",
         "-coverageOptions", f"generateAdditionalMetrics;assemblyFilters:+{asm_name}",
         "-testResults", f"{model_dir}/playmode-results.xml",
         "-logFile", f"{model_dir}/playmode-log.txt"
@@ -171,9 +174,9 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
     subprocess.run([
         "/opt/Unity/Unity", "-projectPath", project_path, "-batchmode", "-nographics",
         "-debugCodeOptimization", "-enableCodeCoverage", "-coverageResultsPath", coverage_dir,
-        "-disable-assembly-updater"
-        "-aad"
-        "-no-licensing"
+        "-disable-assembly-updater",
+        "-aad",
+        "-no-licensing",
         "-coverageOptions", f"generateHtmlReport;generateBadgeReport;assemblyFilters:+{asm_name}",
         "-quit", "-logFile", f"{model_dir}/coverage-report-log.txt"
     ], check=False)
@@ -182,9 +185,9 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
     subprocess.run([
         "/opt/Unity/Unity", "-projectPath", project_path, "-batchmode", "-nographics",
         "-executeMethod", "LaundryNDishes.CLI.LndCommandLineInterface.ExportTestReport",
-        "-disable-assembly-updater"
-        "-aad"
-        "-no-licensing"
+        "-disable-assembly-updater",
+        "-aad",
+        "-no-licensing",
         "-csv", f"{model_dir}/testList.csv",
         "-logFile", f"{model_dir}/export-cli-log.txt"
     ], check=False)
