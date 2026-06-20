@@ -370,7 +370,8 @@ def run_vllm(model_name):
 def get_best_gguf_models(limit=5, completed_models=None,
                          intruct_only=False,days_old=365,
                          modelt_filter=["gguf", "text-generation", "code","llama.cpp"],
-                         model_search="", max_size=8.0):
+                         model_search="", max_size=8.0,
+                         bigger_first=False,oder_size=True):
     if completed_models is None:
         completed_models = set()
 
@@ -413,7 +414,7 @@ def get_best_gguf_models(limit=5, completed_models=None,
 
         eh_instruct_ou_it = (
             "instruct" in model_id_lower or 
-            "-it" in model_id_lower or 
+            "-i" in model_id_lower or 
             "instruct" in tags_lower or 
             "it" in tags_lower
         )
@@ -463,6 +464,6 @@ def get_best_gguf_models(limit=5, completed_models=None,
 
         if limit and len(filtered_models) >= limit:
             break
-
-    filtered_models.sort(key=lambda x: x["size_gb"])
+    if(oder_size):
+        filtered_models.sort(key=lambda x: x["size_gb"], reverse=bigger_first)
     return filtered_models
