@@ -74,7 +74,7 @@ singularity exec --nv --writable-tmpfs \
   --bind "$ARTIFACTS_DIR":/app/artifacts \
   --bind "$SCRATCH_DIR/hf_scratch_download":/app/scratch_models \
   --bind "$SCRATCH_DIR/container_tmp":/tmp \
-  --bind "$SCRATCH_DIR/singularity_tmp_var":/var/tmp \
+  --bind "$SCRATCH_DIR/container_tmp_var":/var/tmp \
   --bind ./in_container/orchestrator.py:/app/orchestrator.py \
   --bind ./in_container/utils.py:/app/utils.py \
   --bind ./in_container/pipeline.sh:/app/pipeline.sh \
