@@ -228,7 +228,7 @@ def run_llamacpp(local_model_path, identifier):
         "--port", "58291",
         "-c", "2048",
         "--alias", "vllmModel",
-        "--ctx-shift",
+        "--context-shift",
         "-np", "1",
     ]
 
