@@ -178,30 +178,62 @@ def move_generated_tests(env_var_name, destination_subfolder, model_dir):
         except Exception as e:
             print(f"⚠️ Falha ao mover {item}: {e}")
 
-def kill_zombie_servers(port="11434"):
-    """Limpeza cirúrgica de processos usando psutil."""
-    print(f"🧹 [Limpeza] Iniciando faxina com psutil...")
 
-    # Lista de nomes de processos que queremos matar
-    targets = ["vllm", "llama-server", "server", "python"]
+def kill_zombie_servers(port="58291", kill_unity=False, project_path="/app/project"):
+    """
+    Limpeza cirúrgica de processos zumbis (LLM e Unity) e travas de arquivo.
+    Protegido contra suicídio do próprio orquestrador Python.
+    """
+    print(f"🧹 [Limpeza] Iniciando faxina automatizada...")
+
+    # Alvos específicos de cada ecossistema
+    llm_targets = ["vllm", "llama-server", "server", "python"]
+    unity_targets = ["unity", "licensingclient", "upm-"]
+
+    meu_pid = os.getpid()
 
     for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
         try:
-            cmdline = " ".join(proc.info['cmdline'] or [])
-            # Mata se for um processo vLLM ou Llama.cpp que está na porta 11434
-            if any(t in cmdline.lower() for t in targets) and str(port) in cmdline:
-                print(f"💀 Matando zumbi: {proc.info['name']} (PID: {proc.info['pid']})")
-                proc.terminate()  # Envia SIGTERM primeiro
-                proc.wait(timeout=3)  # Espera 3s para morrer
+            pid = proc.info['pid']
+            # Anti-suicídio: Nunca deixa o orquestrador matar a si mesmo
+            if pid == meu_pid:
+                continue
+
+            cmdline_list = proc.info['cmdline'] or []
+            cmdline = " ".join(cmdline_list).lower()
+            proc_name = (proc.info['name'] or "").lower()
+
+            # 🛑 CASO 1: Caçar servidores de LLM travados na porta informada
+            if any(t in cmdline for t in llm_targets) and str(port) in cmdline:
+                print(f"💀 Matando zumbi LLM: {proc.info['name']} (PID: {pid})")
+                proc.kill()  # Força bruta direta (SIGKILL) para não dar chance de travar
+
+            # 🎮 CASO 2: Caçar instâncias órfãs da Unity e ferramentas de licença
+            elif kill_unity and (any(t in proc_name for t in unity_targets) or "/opt/unity/unity" in cmdline):
+                print(f"💀 Matando processo órfão da Unity: {proc.info['name']} (PID: {pid})")
+                proc.kill()
+
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired):
             continue
 
-    # Loop de verificação de porta mantido como segurança extra
-    for _ in range(10):
+    # 📁 CASO 3: Destruir o arquivo de trava que impede a Unity de abrir em lote (Batchmode)
+    if kill_unity and project_path:
+        lockfile_path = os.path.join(project_path, "Temp", "UnityLockfile")
+        if os.path.exists(lockfile_path):
+            try:
+                print("🧹 [Limpeza] UnityLockfile antigo detectado! Removendo trava de disco...")
+                os.remove(lockfile_path)
+                print("🟢 Trava de disco removida com sucesso.")
+            except Exception as e:
+                print(f"⚠️ Alerta: Não foi possível remover o UnityLockfile: {e}")
+
+    # Validação final da porta do LLM
+    for _ in range(5):
         if os.system(f"fuser {port}/tcp >/dev/null 2>&1") != 0:
-            print(f"🟢 Porta {port} livre.")
+            print(f"🟢 Porta {port} livre e pronta para o próximo modelo.")
             return True
         time.sleep(1)
+
     return False
 
 
