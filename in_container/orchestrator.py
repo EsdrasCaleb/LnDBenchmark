@@ -226,8 +226,10 @@ def run_llamacpp(local_model_path, identifier):
         "llama-server",
         "-m", local_model_path,
         "--port", "58291",
-        "-c", "2048",  
-        "--alias", "vllmModel"
+        "-c", "2048",
+        "--alias", "vllmModel",
+        "--ctx-shift",
+        "-np", "1",
     ]
 
     if has_gpu:
