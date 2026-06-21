@@ -413,7 +413,7 @@ def main():
 
         # Busca os modelos menores (Top 10 até 3GB)
         small_models = get_best_gguf_models(
-            limit=10, model_search="-coder-csharp", modelt_filter="gguf", max_size=4, oder_size=False
+            limit=10, model_search="-csharp", modelt_filter="gguf", max_size=4, oder_size=False
         )
 
         # Concatena as duas listas de forma limpa
