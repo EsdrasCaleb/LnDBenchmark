@@ -427,7 +427,7 @@ def main():
 
 
         # Concatena as duas listas de forma limpa
-        models_to_test =csharp_models+ large_models + small_models
+        models_to_test =csharp_models + small_models+ large_models
     else:
         models_to_test = get_best_gguf_models(limit=1, completed_models=completed_models,  max_size=1)
 
@@ -460,7 +460,9 @@ def main():
                 repo_id=target["repo_id"],
                 filename=target["filename"],
                 token=os.environ.get("HF_TOKEN"),
-                local_dir=scratch_download_dir,  # 📁 Salva direto no Scratch físico do Cluster
+                local_dir=scratch_download_dir,
+                local_dir_use_symlinks=False,
+                resume_download=True
             )
 
             # Print de debug para você monitorar no log se ele está indo para o lugar certo
