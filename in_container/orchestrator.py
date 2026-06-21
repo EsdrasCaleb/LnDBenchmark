@@ -412,12 +412,22 @@ def main():
         # get_best_gguf_models(limit=0, completed_models=completed_models, days_old=999,model_search="unity", modelt_filter=["gguf"], max_size=9)
 
         # Busca os modelos menores (Top 10 até 3GB)
-        small_models = get_best_gguf_models(
-            limit=10, model_search="-csharp", modelt_filter="gguf", max_size=4, oder_size=False
+        csharp_models = get_best_gguf_models(
+            limit=10, model_search="-csharp", modelt_filter="gguf", max_size=4
         )
 
+        large_models = get_best_gguf_models(
+            limit=3, model_search="code", modelt_filter="gguf", max_size=12
+        )
+
+        # Busca os modelos menores (Top 10 até 3GB)
+        small_models = get_best_gguf_models(
+            limit=10, model_search="code", modelt_filter="gguf", max_size=4
+        )
+
+
         # Concatena as duas listas de forma limpa
-        models_to_test = large_models + small_models
+        models_to_test =csharp_models+ large_models + small_models
     else:
         models_to_test = get_best_gguf_models(limit=1, completed_models=completed_models,  max_size=1)
 
