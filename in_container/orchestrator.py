@@ -415,7 +415,7 @@ def main():
 
         # Busca os modelos menores (Top 10 até 3GB)
         models_to_test = get_best_gguf_models(
-            limit=5, model_search="-code",  days_old=999, modelt_filter="gguf", max_size=12
+            limit=5, model_search="-qwen3.5-9B-super-coder",  days_old=999, modelt_filter="gguf", max_size=12
         )
     else:
         models_to_test = get_best_gguf_models(limit=1, completed_models=completed_models,  max_size=1)
