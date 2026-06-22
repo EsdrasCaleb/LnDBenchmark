@@ -403,7 +403,9 @@ def main():
         with open(completed_path, "r") as f:
             completed_models = {line.strip() for line in f if line.strip()}
         print(f"💾 Histórico carregado: {len(completed_models)} modelos registrados anteriormente.")
+    os.environ["HF_HUB_DOWNLOAD_TIMEOUT"] = "60"  # Tempo em segundos
 
+    os.environ["HF_HUB_ETAG_TIMEOUT"] = "30"  # Tempo em segundos
     print("🦙 MODO SELECIONADO: PIPELINE LLAMA.CPP (Modelos GGUF compactos)")
     has_gpu = os.environ.get("HAS_GPU", "false").lower() == "true"
     if has_gpu:
@@ -413,7 +415,7 @@ def main():
 
         # Busca os modelos menores (Top 10 até 3GB)
         models_to_test = get_best_gguf_models(
-            limit=0, model_search="-code",  days_old=999, modelt_filter="gguf", max_size=1
+            limit=5, model_search="-code",  days_old=999, modelt_filter="gguf", max_size=12
         )
     else:
         models_to_test = get_best_gguf_models(limit=1, completed_models=completed_models,  max_size=1)
