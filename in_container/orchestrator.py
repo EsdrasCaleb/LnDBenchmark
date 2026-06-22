@@ -405,7 +405,7 @@ def main():
         print(f"💾 Histórico carregado: {len(completed_models)} modelos registrados anteriormente.")
     os.environ["HF_HUB_DOWNLOAD_TIMEOUT"] = "60"  # Tempo em segundos
 
-    os.environ["HF_HUB_ETAG_TIMEOUT"] = "30"  # Tempo em segundos
+    os.environ["HF_HUB_ETAG_TIMEOUT"] = "60"  # Tempo em segundos
     print("🦙 MODO SELECIONADO: PIPELINE LLAMA.CPP (Modelos GGUF compactos)")
     has_gpu = os.environ.get("HAS_GPU", "false").lower() == "true"
     if has_gpu:
