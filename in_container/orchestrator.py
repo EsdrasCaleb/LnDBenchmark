@@ -12,40 +12,103 @@ import pynvml
 import csv
 import threading
 from utils import kill_zombie_servers, ResourceMonitor, parse_test_results, clear_leftover_tests, move_generated_tests,parse_unity_coverage_detailed,get_best_gguf_models
+import os
+import pandas as pd
 
 
 def generate_global_leaderboard(models_root_dir, backend_name):
-    """Cria o ranking unificado de todos os modelos processados."""
+    """Cria o ranking unificado de todos os modelos processados, incluindo métricas de tempo e correções."""
     print(f"🏆 Compilando Tabela do Leaderboard Global ({backend_name.upper()})...")
     all_reports = []
+
     if not os.path.exists(models_root_dir):
+        print("⚠️ Diretório raiz de modelos não encontrado.")
         return
 
     for folder in os.listdir(models_root_dir):
-        csv_path = os.path.join(models_root_dir, folder, "coverage_report.csv")
-        if os.path.exists(csv_path):
+        folder_path = os.path.join(models_root_dir, folder)
+        if not os.path.isdir(folder_path):
+            continue
+
+        csv_coverage_path = os.path.join(folder_path, "coverage_report.csv")
+        csv_generation_path = os.path.join(folder_path, "testGeneration.csv")
+
+        if os.path.exists(csv_coverage_path):
             try:
-                df = pd.read_csv(csv_path)
-                all_reports.append(df)
-            except Exception:
-                pass
-                
+                # 1. Ler o relatório de cobertura padrão
+                df_coverage = pd.read_csv(csv_coverage_path)
+
+                # Valores padrão caso o arquivo de geração não exista ou esteja vazio
+                total_gen_time_ms = 0
+                avg_corrections_success = 0.0
+
+                # 2. Processar o arquivo de geração de testes (testGeneration.csv)
+                if os.path.exists(csv_generation_path):
+                    try:
+                        df_gen = pd.read_csv(csv_generation_path)
+                        # Remove possíveis espaços em branco dos nomes das colunas
+                        df_gen.columns = df_gen.columns.str.strip()
+
+                        # Garantir tipos numéricos para evitar quebras
+                        if 'TimeToGenerate(ms)' in df_gen.columns:
+                            df_gen['TimeToGenerate(ms)'] = pd.to_numeric(df_gen['TimeToGenerate(ms)'],
+                                                                         errors='coerce').fillna(0)
+                            total_gen_time_ms = df_gen['TimeToGenerate(ms)'].sum()
+
+                        if 'NumberOfCorrections' in df_gen.columns and 'Status' in df_gen.columns:
+                            df_gen['NumberOfCorrections'] = pd.to_numeric(df_gen['NumberOfCorrections'],
+                                                                          errors='coerce').fillna(0)
+
+                            # Filtro defensivo aceitando 'SUCCESS' ou 'SUCESS' (com um C, como gerado pelo C#)
+                            success_mask = df_gen['Status'].astype(str).str.upper().str.strip().isin(
+                                ['SUCCESS', 'SUCESS'])
+                            df_success = df_gen[success_mask]
+
+                            if not df_success.empty:
+                                avg_corrections_success = df_success['NumberOfCorrections'].mean()
+
+                    except Exception as e:
+                        print(f"⚠️ Alerta ao processar tempos/correções para {folder}: {e}")
+
+                # 3. Injetar as novas colunas calculadas no DataFrame de cobertura deste modelo
+                df_coverage['total_gen_time(s)'] = round(total_gen_time_ms / 1000.0,
+                                                         2)  # Convertido para segundos para melhor leitura
+                df_coverage['avg_corrections_success'] = round(avg_corrections_success, 2)
+
+                all_reports.append(df_coverage)
+
+            except Exception as e:
+                print(f"⚠️ Erro ao ler coverage_report para {folder}: {e}")
+
     if all_reports:
         leaderboard_df = pd.concat(all_reports, ignore_index=True)
-        numeric_cols = ["editmodetestpassing", "playmodetestspassing", "coveredlines"]
+
+        # Garante a tipagem das colunas numéricas originais e das novas colunas
+        numeric_cols = [
+            "editmodetestpassing", "playmodetestspassing", "coveredlines",
+            "total_gen_time(s)", "avg_corrections_success"
+        ]
         for col in numeric_cols:
             if col in leaderboard_df.columns:
                 leaderboard_df[col] = pd.to_numeric(leaderboard_df[col], errors='coerce').fillna(0)
-                
-        leaderboard_df = leaderboard_df.sort_values(
-            by=["playmodetestspassing", "coveredlines"], 
-            ascending=[False, False]
-        )
-        
+
+        # Ordenação do ranking principal (Critério: Testes passando -> Linhas cobertas -> Menor tempo)
+        sort_by = ["playmodetestspassing", "coveredlines", "total_gen_time(s)"]
+        ascending_rules = [False, False, True]  # Menos tempo de geração é melhor em caso de empate
+
+        # Filtra apenas colunas existentes para evitar erros de ordenação
+        sort_by = [col for col in sort_by if col in leaderboard_df.columns]
+        ascending_rules = ascending_rules[:len(sort_by)]
+
+        leaderboard_df = leaderboard_df.sort_values(by=sort_by, ascending=ascending_rules)
+
+        # Salva o arquivo unificado final em disco
         output_path = "/app/artifacts/GLOBAL_LEADERBOARD.csv"
         leaderboard_df.to_csv(output_path, index=False)
-        print(f"\n👑 RANKING FINAL DE QUALIDADE DE CÓDIGO ({backend_name.upper()}):")
+
+        print(f"\n👑 RANKING FINAL DE QUALIDADE E PERFORMANCE ({backend_name.upper()}):")
         print(leaderboard_df.to_string(index=False))
+
 
 # =====================================================================
 # 🎮 PIPELINE DA ENGINE UNITY
@@ -74,6 +137,8 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
         "/opt/Unity/Unity", "-projectPath", project_path, "-batchmode", "-nographics",
         "-executeMethod", "LaundryNDishes.CLI.LndCommandLineInterface.GenerateTestsFolder",
         "-folder", script_path, "-csv", f"{model_dir}/testGeneration.csv",
+        "-no-licensing",
+        "-disable-assembly-updater",
         "-logFile", f"{model_dir}/generation-cli-log.txt"
     ]
 
@@ -116,9 +181,8 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
     subprocess.run([
         "/opt/Unity/Unity", "-projectPath", project_path, "-batchmode", "-nographics",
         "-executeMethod", "LaundryNDishes.CLI.LndCommandLineInterface.ExportTestReport",
-        "-no-licensing"
-       "-disable-assembly-updater"
-        "-aad"
+        "-no-licensing",
+       "-disable-assembly-updater",
         "-csv", test_list_path,
         "-logFile", f"{model_dir}/export-cli-log.txt"
     ], check=False)
@@ -147,9 +211,8 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
         "-testPlatform", "editmode", "-runTests", "-debugCodeOptimization", "-enableCodeCoverage",
         "-coverageResultsPath", coverage_dir,
         "-coverageOptions", f"generateAdditionalMetrics;assemblyFilters:+{asm_name}",
-        "-disable-assembly-updater"
-        "-aad"
-        "-no-licensing"
+        "-disable-assembly-updater",
+        "-no-licensing",
         "-testResults", f"{model_dir}/editmode-results.xml",
         "-logFile", f"{model_dir}/editmode-log.txt"
     ], check=False)
@@ -159,9 +222,8 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
         "/opt/Unity/Unity", "-projectPath", project_path, "-batchmode", "-nographics",
         "-testPlatform", "playmode", "-runTests", "-debugCodeOptimization", "-enableCodeCoverage",
         "-coverageResultsPath", coverage_dir,
-        "-disable-assembly-updater"
-        "-aad"
-        "-no-licensing"
+        "-disable-assembly-updater",
+        "-no-licensing",
         "-coverageOptions", f"generateAdditionalMetrics;assemblyFilters:+{asm_name}",
         "-testResults", f"{model_dir}/playmode-results.xml",
         "-logFile", f"{model_dir}/playmode-log.txt"
@@ -171,9 +233,8 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
     subprocess.run([
         "/opt/Unity/Unity", "-projectPath", project_path, "-batchmode", "-nographics",
         "-debugCodeOptimization", "-enableCodeCoverage", "-coverageResultsPath", coverage_dir,
-        "-disable-assembly-updater"
-        "-aad"
-        "-no-licensing"
+        "-disable-assembly-updater",
+        "-no-licensing",
         "-coverageOptions", f"generateHtmlReport;generateBadgeReport;assemblyFilters:+{asm_name}",
         "-quit", "-logFile", f"{model_dir}/coverage-report-log.txt"
     ], check=False)
@@ -182,9 +243,8 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
     subprocess.run([
         "/opt/Unity/Unity", "-projectPath", project_path, "-batchmode", "-nographics",
         "-executeMethod", "LaundryNDishes.CLI.LndCommandLineInterface.ExportTestReport",
-        "-disable-assembly-updater"
-        "-aad"
-        "-no-licensing"
+        "-disable-assembly-updater",
+        "-no-licensing",
         "-csv", f"{model_dir}/testList.csv",
         "-logFile", f"{model_dir}/export-cli-log.txt"
     ], check=False)
@@ -343,12 +403,15 @@ def main():
         with open(completed_path, "r") as f:
             completed_models = {line.strip() for line in f if line.strip()}
         print(f"💾 Histórico carregado: {len(completed_models)} modelos registrados anteriormente.")
+    os.environ["HF_HUB_DOWNLOAD_TIMEOUT"] = "60"  # Tempo em segundos
 
+    os.environ["HF_HUB_ETAG_TIMEOUT"] = "60"  # Tempo em segundos
     print("🦙 MODO SELECIONADO: PIPELINE LLAMA.CPP (Modelos GGUF compactos)")
     has_gpu = os.environ.get("HAS_GPU", "false").lower() == "true"
     if has_gpu:
         # get_best_gguf_models(limit=0,model_search="code",modelt_filter="gguf",max_size=4,oder_size=False) 
         # get_best_gguf_models(limit=7,model_search="code",modelt_filter="gguf",max_size=12,oder_size=False)
+<<<<<<< HEAD
         # models_to_test = get_best_gguf_models(limit=0, completed_models=completed_models, days_old=999,
         #                                       model_search="unity", modelt_filter=["gguf"], max_size=4.1)
         modelos = get_best_gguf_models(limit=0,model_search="unsloth/gemma-4-E2B-it-qat-mobile-GGUF",modelt_filter="gguf",max_size=12)        
@@ -364,6 +427,14 @@ def main():
         modelos =modelos+ get_best_gguf_models(limit=0,model_search="unsloth/gemma-4-12b-it-GGUF",modelt_filter="gguf",max_size=12)
         modelos =modelos+ get_best_gguf_models(limit=0,model_search="unsloth/gemma-4-E2B-it-GGUF",modelt_filter="gguf",max_size=12)
         models_to_test =modelos+ get_best_gguf_models(limit=0,model_search="unsloth/gemma-4-E4B-it-GGUF",modelt_filter="gguf",max_size=12)
+=======
+        # get_best_gguf_models(limit=0, completed_models=completed_models, days_old=999,model_search="unity", modelt_filter=["gguf"], max_size=9)
+
+        # Busca os modelos menores (Top 10 até 3GB)
+        models_to_test = get_best_gguf_models(
+            limit=5, model_search="-qwen3.5-9B-super-coder",  days_old=999, modelt_filter="gguf", max_size=12
+        )
+>>>>>>> 830b5dc4c0b614e73e4db04900a8cc261c79237f
     else:
         models_to_test = get_best_gguf_models(limit=1, completed_models=completed_models,  max_size=1)
 
@@ -396,7 +467,9 @@ def main():
                 repo_id=target["repo_id"],
                 filename=target["filename"],
                 token=os.environ.get("HF_TOKEN"),
-                local_dir=scratch_download_dir,  # 📁 Salva direto no Scratch físico do Cluster
+                local_dir=scratch_download_dir,
+                local_dir_use_symlinks=False,
+                resume_download=True
             )
 
             # Print de debug para você monitorar no log se ele está indo para o lugar certo
