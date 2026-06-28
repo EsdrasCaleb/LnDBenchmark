@@ -403,7 +403,7 @@ def get_best_gguf_models(limit=5, completed_models=None,
                          intruct_only=False,days_old=365,
                          modelt_filter=["gguf", "text-generation", "code","llama.cpp"],
                          model_search="", max_size=8.0,
-                         bigger_first=False,oder_size=True):
+                         bigger_first=False,oder_size=True,author=None,short="trending_score"):
     if completed_models is None:
         completed_models = set()
 
@@ -425,7 +425,8 @@ def get_best_gguf_models(limit=5, completed_models=None,
     available_models = api.list_models(
         filter=modelt_filter,
         search=model_search,
-        sort="trending_score",
+        sort=short,
+        author=author,
         full=True
     )
 
@@ -469,7 +470,7 @@ def get_best_gguf_models(limit=5, completed_models=None,
                     continue
 
                 # Ignora fragmentos
-                if any(part in item.path.lower() for part in ["split", "-of-", "part", "mmproj"]):
+                if any(part in item.path.lower() for part in ["split", "-of-", "part", "mmproj",'mtp','imatrix']):
                     continue
                 
                 size_bytes = getattr(item, 'size', 0) or 0

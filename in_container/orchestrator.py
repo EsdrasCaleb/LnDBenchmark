@@ -413,19 +413,9 @@ def main():
         # get_best_gguf_models(limit=7,model_search="code",modelt_filter="gguf",max_size=12,oder_size=False)
         # models_to_test = get_best_gguf_models(limit=0, completed_models=completed_models, days_old=999,
         #                                       model_search="unity", modelt_filter=["gguf"], max_size=4.1)
-        modelos = get_best_gguf_models(limit=0,model_search="unsloth/gemma-4-E2B-it-qat-mobile-GGUF",modelt_filter="gguf",max_size=12)        
-        modelos =modelos+ get_best_gguf_models(limit=0,model_search="unsloth/gemma-4-E4B-it-qat-mobile-GGUF",modelt_filter="gguf",max_size=12)
-        modelos =modelos+ get_best_gguf_models(limit=0,model_search="unsloth/gemma-4-E2B-it-qat-GGUF",modelt_filter="gguf",max_size=12)
-        modelos =modelos+ get_best_gguf_models(limit=0,model_search="unsloth/gemma-4-12B-it-qat-GGUF",modelt_filter="gguf",max_size=12)
-        modelos =modelos+ get_best_gguf_models(limit=0,model_search="unsloth/gemma-4-26B-A4B-it-qat-GGUF",modelt_filter="gguf",max_size=12)
-        modelos =modelos+ get_best_gguf_models(limit=0,model_search="unsloth/gemma-4-E4B-it-qat-GGUF",modelt_filter="gguf",max_size=12)
-        modelos =modelos+ get_best_gguf_models(limit=0,model_search="unsloth/Qwen3.5-4B-GGUFF",modelt_filter="gguf",max_size=12)
-        modelos =modelos+ get_best_gguf_models(limit=0,model_search="unsloth/Qwen3.5-2B-GGUF",modelt_filter="gguf",max_size=12)
-        modelos =modelos+ get_best_gguf_models(limit=0,model_search="unsloth/Qwen3.5-0.8B-GGUF",modelt_filter="gguf",max_size=12)
-        modelos =modelos+ get_best_gguf_models(limit=0,model_search="unsloth/Qwen3.5-9B-GGUF",modelt_filter="gguf",max_size=12)
-        modelos =modelos+ get_best_gguf_models(limit=0,model_search="unsloth/gemma-4-12b-it-GGUF",modelt_filter="gguf",max_size=12)
-        modelos =modelos+ get_best_gguf_models(limit=0,model_search="unsloth/gemma-4-E2B-it-GGUF",modelt_filter="gguf",max_size=12)
-        models_to_test =modelos+ get_best_gguf_models(limit=0,model_search="unsloth/gemma-4-E4B-it-GGUF",modelt_filter="gguf",max_size=12)
+        modelos = get_best_gguf_models(limit=50,author="unsloth",modelt_filter="gguf",max_size=7,short="lastModified")         
+        modelos =modelos+get_best_gguf_models(limit=50,author="bartowski",modelt_filter="gguf",max_size=7,short="lastModified")    
+        models_to_test =modelos+get_best_gguf_models(limit=50,author="AesSedai",modelt_filter="gguf",max_size=7,short="lastModified")  
     else:
         models_to_test = get_best_gguf_models(limit=1, completed_models=completed_models,  max_size=1)
 
