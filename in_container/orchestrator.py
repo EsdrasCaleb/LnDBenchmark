@@ -125,6 +125,13 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
     os.makedirs(coverage_dir, exist_ok=True)
     
     clear_leftover_tests()
+    csv_path = os.path.join(model_dir, "testGeneration.csv")
+    if os.path.exists(csv_path):
+        print(f"🧹 [Limpeza] Removendo arquivo de resultados anterior: {csv_path}")
+        try:
+            os.remove(csv_path)
+        except Exception as e:
+            print(f"⚠️ [Aviso] Não foi possível apagar o CSV antigo: {e}")
 
     print(f"🛠️ [Unity] Executando geração de casos de teste via {backend_name.upper()}...")
     monitor = ResourceMonitor(model_name=model_safe_name, output_file="/app/artifacts/performance_report.csv")
