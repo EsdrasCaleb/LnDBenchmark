@@ -5,7 +5,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
-#SBATCH --partition=gpu-4-h200,gpu-8-h100,gpu-4-a100,gpu-8-v100
+#SBATCH --partition=gpu-4-h200,gpu-8-h100,gpu-4-a100
 #SBATCH --time=72:00:00         
 #SBATCH --mem=32G
 #SBATCH --gres=gpu:1            
@@ -49,6 +49,31 @@ module load compilers/nvidia/cuda/12.6
 export SINGULARITY_CACHEDIR="$SCRATCH_DIR/.singularity/cache"
 export SINGULARITY_TMPDIR="$SCRATCH_DIR/.singularity/tmp"
 mkdir -p "$SINGULARITY_CACHEDIR" "$SINGULARITY_TMPDIR"
+
+# =====================================================================
+# LÓGICA DE CAPTURA DE SINAL (TRAP) PARA DEVOLUÇÃO DA LICENÇA
+# =====================================================================
+devolver_licenca() {
+    echo "⚠️ [SLURM] Sinal de cancelamento ou Timeout detectado!"
+    echo "🔓 Devolvendo licença Unity de forma segura antes do nó fechar..."
+    
+    # Como a Unity está dentro do container, executamos um comando rápido nela
+    singularity exec --nv --writable-tmpfs \
+      --bind "$ARTIFACTS_DIR":/app/artifacts \
+      "$SCRATCH_DIR/unity-vllm-bench.sif" \
+      /opt/Unity/Unity -quit -batchmode -nographics \
+      -returnlicense "$UNITY_SERIAL" \
+      -username "$UNITY_EMAIL" \
+      -password "$UNITY_PASSWORD" \
+      -logFile /app/artifacts/return-log.txt
+
+    echo "✅ Licença devolvida com sucesso. Encerrando o Job."
+    exit 0
+}
+
+# Registra a função para rodar se o SLURM mandar o aviso de tempo (USR1) ou cancelamento (TERM)
+trap 'devolver_licenca' USR1 TERM
+# =====================================================================
 
 # =====================================================================
 # LÓGICA SLURM DE AUTO-REEXECUÇÃO POR TIMEOUT OU CRASH
