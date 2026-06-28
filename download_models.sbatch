@@ -36,7 +36,7 @@ source "$VENV_DIR/bin/activate"
 # 🆙 Passo 3: Atualizar o pip e instalar a biblioteca necessária
 echo "📥 Instalando dependência (huggingface_hub)..."
 pip install --upgrade pip
-pip install huggingface_hub
+pip install huggingface_hub, dataclasses
 
 # 🏃 Passo 4: Executar o arquivo Python de download
 PYTHON_SCRIPT="baixar_modelos.py"
