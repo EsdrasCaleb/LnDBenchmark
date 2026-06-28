@@ -414,7 +414,8 @@ def main():
         # models_to_test = get_best_gguf_models(limit=0, completed_models=completed_models, days_old=999,
         #                                       model_search="unity", modelt_filter=["gguf"], max_size=4.1)
         modelos = get_best_gguf_models(limit=0,model_search="Janus",author="unsloth",modelt_filter="gguf",max_size=7,short="lastModified")         
-        modelos = get_best_gguf_models(limit=75,author="unsloth",modelt_filter="gguf",max_size=7,short="lastModified")         
+        modelos =modelos+ get_best_gguf_models(limit=75,author="unsloth",modelt_filter="gguf",max_size=7,short="lastModified")         
+        modelos =modelos+get_best_gguf_models(limit=0,model_search="code",author="bartowski",modelt_filter="gguf",max_size=7,short="lastModified")    
         models_to_test =modelos+get_best_gguf_models(limit=75,author="bartowski",modelt_filter="gguf",max_size=7,short="lastModified")    
     else:
         models_to_test = get_best_gguf_models(limit=1, completed_models=completed_models,  max_size=1)
