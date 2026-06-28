@@ -39,7 +39,7 @@ pip install --upgrade pip
 pip install huggingface_hub
 
 # 🏃 Passo 4: Executar o arquivo Python de download
-PYTHON_SCRIPT="seu_arquivo_download.py"
+PYTHON_SCRIPT="baixar_modelos.py"
 
 if [ -f "$PYTHON_SCRIPT" ]; then
     echo "▶️ Iniciando o script Python: $PYTHON_SCRIPT"
