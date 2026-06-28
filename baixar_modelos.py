@@ -58,7 +58,7 @@ for idx, item in enumerate(modelos_brutos, 1):
         local_path = hf_hub_download(
             repo_id=repo_id,
             filename=filename,
-            use_auth_token=os.environ.get("HF_TOKEN"),
+            token=os.environ.get("HF_TOKEN"),
             local_dir=DEST_DIR,
             local_dir_use_symlinks=False,  # Grava o arquivo direto no scratch físico
             resume_download=True           # Caso a rede oscile, continua de onde parou

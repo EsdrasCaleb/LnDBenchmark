@@ -12,7 +12,19 @@ echo "🚀 Iniciando o Job no nó $(hostname)"
 
 # 🛠️ Passo 1: Carregar o módulo do Python do Cluster (se aplicável)
 # Caso seu cluster use environment modules, descomente a linha abaixo e mude para a versão instalada:
-# module load python/3.10
+module load python/3.10.8 || module load python/3.10 || module load python/3.9
+
+# Se o comando 'python3' padrão do nó ainda for o 3.6, mas existir o comando 'python3.10' ou 'python3.9':
+# Vamos forçar a criação do venv usando ele:
+if [ ! -d "$VENV_DIR" ]; then
+    echo "📦 Criando ambiente virtual..."
+    if command -v python3.10 &>/dev/null; then
+        python3.10 -m venv "$VENV_DIR"
+    elif command -v python3.9 &>/dev/null; then
+        python3.9 -m venv "$VENV_DIR"
+    else
+        python3 -m venv "$VENV_DIR" # Cai no 3.6 se não houver outro
+    fi
 
 # 📦 Passo 2: Criar e ativar o Virtual Environment (venv) se não existir
 if [ ! -d "$VENV_DIR" ]; then
