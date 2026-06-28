@@ -465,7 +465,6 @@ def get_best_gguf_models(limit=5, completed_models=None,
         for item in repo_files:
             if item.path.endswith(".gguf"):
                 security_info = getattr(item, 'security', None)
-                print(item)
                 if security_info and security_info.safe is not True and security_info.status == "unsafe":
                     print(f"⚠️ Modelo bloqueado por segurança: {model.modelId} ({item.path})")
                     continue
