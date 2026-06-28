@@ -4,13 +4,13 @@ from huggingface_hub import hf_hub_download
 
 # Configurações do diretório de destino
 DEST_DIR = "../scratch/hf_scratch_download/"
-DEST_DIR = "hf_scratch_download/"
 os.makedirs(DEST_DIR, exist_ok=True)
 
 
 
 # Lista bruta extraída do seu log
 modelos_brutos = [
+    "bartowski/North-Mini-Code-1.0-GGUF/North-Mini-Code-1.0-Q2_K_L.gguf",
     "bartowski/cerebras_Qwen3-Coder-REAP-25B-A3B-GGUF/cerebras_Qwen3-Coder-REAP-25B-A3B-Q3_K_M.gguf",
     "unsloth/JanusCoder-14B-GGUF/JanusCoder-14B-UD-Q5_K_XL.gguf",
     "unsloth/JanusCoder-8B-GGUF/JanusCoder-8B-UD-Q8_K_XL.gguf",

@@ -26,6 +26,7 @@ source "$VENV_DIR/bin/activate"
 # 🆙 Passo 3: Atualizar o pip e instalar as dependências necessárias
 echo "📥 Instalando/Atualizando dependências (huggingface_hub)..."
 pip install --upgrade pip
+pip install dataclasses
 pip install huggingface_hub
 
 # 🔑 Passo 4: Exportar o Token do Hugging Face se necessário
