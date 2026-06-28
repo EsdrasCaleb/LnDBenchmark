@@ -85,16 +85,15 @@ def generate_global_leaderboard(models_root_dir, backend_name):
 
         # Garante a tipagem das colunas numéricas originais e das novas colunas
         numeric_cols = [
-            "editmodetestpassing", "playmodetestspassing", "coveredlines",
-            "total_gen_time(s)", "avg_corrections_success"
+            "editmodetestpassing", "playmodetestspassing", "coveredlines"
         ]
         for col in numeric_cols:
             if col in leaderboard_df.columns:
                 leaderboard_df[col] = pd.to_numeric(leaderboard_df[col], errors='coerce').fillna(0)
 
         # Ordenação do ranking principal (Critério: Testes passando -> Linhas cobertas -> Menor tempo)
-        sort_by = ["playmodetestspassing", "coveredlines", "total_gen_time(s)"]
-        ascending_rules = [False, False, True]  # Menos tempo de geração é melhor em caso de empate
+        sort_by = ["editmodetestpassing","playmodetestspassing", "coveredlines"]
+        ascending_rules = [False,False, False]  # Menos tempo de geração é melhor em caso de empate
 
         # Filtra apenas colunas existentes para evitar erros de ordenação
         sort_by = [col for col in sort_by if col in leaderboard_df.columns]
