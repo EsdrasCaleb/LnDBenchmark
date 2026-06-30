@@ -476,7 +476,7 @@ def get_best_gguf_models(limit=5, completed_models=None,
                     continue
 
                 # Ignora fragmentos
-                if any(part in item.path.lower() for part in ["split", "-of-", "part", "mmproj",'mtp','imatrix',"image"]):
+                if any(part in item.path.lower() for part in ["split", "-of-", "part", "mmproj",'mtp','imatrix',"image","ocr"]):
                     continue
                 
                 size_bytes = getattr(item, 'size', 0) or 0
