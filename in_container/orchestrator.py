@@ -14,6 +14,8 @@ import threading
 from utils import kill_zombie_servers, ResourceMonitor, parse_test_results, clear_leftover_tests, move_generated_tests,parse_unity_coverage_detailed,get_best_gguf_models
 import os
 import pandas as pd
+import atexit
+import signal
 
 
 def generate_global_leaderboard(models_root_dir, backend_name):
@@ -523,6 +525,40 @@ def main():
         f.write("-")
 
     generate_global_leaderboard(models_root_dir, args.backend)
+
+def release_unity_license():
+    print("🔓 Liberando licença Unity...")
+
+    try:
+        subprocess.run([
+            "/opt/Unity/Unity",
+            "-quit",
+            "-batchmode",
+            "-nographics",
+            "-returnlicense",
+            os.environ.get("UNITY_SERIAL"),
+            "-username", os.environ.get("UNITY_EMAIL"),
+            "-password", os.environ.get("UNITY_PASSWORD"),
+            "-logFile", "/app/artifacts/return-log.txt"
+        ], timeout=30)
+    except Exception as e:
+        print(f"⚠️ Falha ao liberar licença Unity: {e}")
+
+def cleanup():
+    try:
+        print("🧹 Cleanup global iniciado...")
+        release_unity_license()
+    except Exception as e:
+        print(f"⚠️ Cleanup falhou: {e}")
+atexit.register(cleanup)
+
+def handler(signum, frame):
+    cleanup()
+    exit(0)
+
+signal.signal(signal.SIGTERM, handler)
+signal.signal(signal.SIGHUP, handler)
+signal.signal(signal.SIGINT, handler)
 
 if __name__ == "__main__":
     main()

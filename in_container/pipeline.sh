@@ -38,6 +38,7 @@ cleanup() {
     /opt/Unity/Unity -quit -batchmode -nographics -returnlicense "$UNITY_SERIAL" -username "$UNITY_EMAIL" -password "$UNITY_PASSWORD" -logFile /app/artifacts/return-log.txt
 }
 trap cleanup EXIT
+trap cleanup TERM INT
 
 # --------------------------------------------------
 # INICIALIZAÇÃO DA UNITY
