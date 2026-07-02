@@ -27,6 +27,9 @@ echo '=================================================='
 
 # Função para garantir a limpeza do ambiente e a correção das permissões
 cleanup() {
+    echo "cleanup"
+
+    kill -TERM "$PID" 2>/dev/null
     echo '🔓 Ajustando permissões de saída nos artefatos...'
     if [ -n "$USER_UID" ] && [ -n "$USER_GID" ]; then
         chown -R "$USER_UID":"$USER_GID" /app/artifacts || true
@@ -37,8 +40,7 @@ cleanup() {
     echo '🔓 Devolvendo licença Unity de forma segura...'
     /opt/Unity/Unity -quit -batchmode -nographics -returnlicense "$UNITY_SERIAL" -username "$UNITY_EMAIL" -password "$UNITY_PASSWORD" -logFile /app/artifacts/return-log.txt
 }
-trap cleanup EXIT
-trap cleanup TERM INT
+trap cleanup TERM INT EXIT
 
 # --------------------------------------------------
 # INICIALIZAÇÃO DA UNITY
@@ -52,4 +54,7 @@ echo '🔑 Ativando licença Unity global...'
 # --------------------------------------------------
 # Chama o Python passando o argumento tratado (ou vazio, aplicando o default do argparse)
 echo "🚀 Iniciando orquestrador Python..."
-PYTHONUNBUFFERED=1 python3 /app/orchestrator.py $BACKEND_ARG
+PYTHONUNBUFFERED=1 python3 /app/orchestrator.py &
+PID=$!
+
+wait $PID

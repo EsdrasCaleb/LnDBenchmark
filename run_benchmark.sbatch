@@ -9,7 +9,7 @@
 #SBATCH --time=72:00:00         
 #SBATCH --mem=32G
 #SBATCH --gres=gpu:1
-#SBATCH --signal=TERM@60
+#SBATCH --signal=B:TERM@60
 
 ARTIFACTS_DIR="unity_artifacts"
 SCRATCH_DIR="$HOME/scratch"
@@ -73,8 +73,7 @@ devolver_licenca() {
 }
 
 # Registra a função para rodar se o SLURM mandar o aviso de tempo (USR1) ou cancelamento (TERM)
-trap 'devolver_licenca' USR1 TERM
-trap 'devolver_licenca' EXIT
+trap 'devolver_licenca' TERM INT EXIT USR1
 # =====================================================================
 
 # =====================================================================
@@ -96,7 +95,7 @@ echo "🎮 Executando Container Llama.cpp + Unity com Suporte a GPU"
 echo "========================================================="
 
 # 🌟 Executa o Singularity com o novo --bind apontando para o Scratch
-exec singularity exec --nv --writable-tmpfs \
+singularity exec --nv --writable-tmpfs \
   --bind "$SCRATCH_DIR/unityprojects/BenchMark2RogueLite":/app/project \
   --bind "$ARTIFACTS_DIR":/app/artifacts \
   --bind "$SCRATCH_DIR/hf_scratch_download":/app/scratch_models \
@@ -106,5 +105,10 @@ exec singularity exec --nv --writable-tmpfs \
   --bind ./in_container/utils.py:/app/utils.py \
   --bind ./in_container/pipeline.sh:/app/pipeline.sh \
   "$SCRATCH_DIR/unity-vllm-bench.sif" /app/pipeline.sh
+status=$?
+
+devolver_licenca
+
+exit $status
 
 echo "✅ Bloco de execução finalizado com sucesso!"
