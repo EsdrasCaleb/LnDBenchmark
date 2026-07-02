@@ -382,6 +382,10 @@ def run_llamacpp(local_model_path, identifier):
 # ⚙️ MÓDULO ORQUESTRADOR CENTRAL (MAIN)
 # =====================================================================
 def main():
+    os.environ["HF_HOME"] = "/app/scratch_models/.cache"
+    os.environ["HUGGINGFACE_HUB_CACHE"] = "/app/scratch_models/.cache/hub"
+    os.environ["HF_HUB_CACHE"] = "/app/scratch_models/.cache/hub"
+    os.makedirs("/app/scratch_models/.cache/hub", exist_ok=True)
     print("DEBUG: Entrou no main do orquestrador.")
     parser = argparse.ArgumentParser(description="Orquestrador Unificado de IA para Testes de Cobertura Unity")
     parser.add_argument(
@@ -461,7 +465,7 @@ def main():
                 token=os.environ.get("HF_TOKEN"),
                 local_dir=scratch_download_dir,
                 local_dir_use_symlinks=False,
-                resume_download=True
+                resume_download=False
             )
 
             # Print de debug para você monitorar no log se ele está indo para o lugar certo
