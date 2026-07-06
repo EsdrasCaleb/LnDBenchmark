@@ -425,11 +425,11 @@ def main():
         # get_best_gguf_models(limit=7,model_search="code",modelt_filter="gguf",max_size=12,oder_size=False)
         # models_to_test = get_best_gguf_models(limit=0, completed_models=completed_models, days_old=999,
         #                                       model_search="unity", modelt_filter=["gguf"], max_size=4.1)    
-        modelos =get_best_gguf_models(limit=1,author="unsloth",modelt_filter="gguf")
-        modelos = modelos + get_best_gguf_models(limit=10, author="unsloth",
-                                                 modelt_filter="gguf", short="lastModified")
-        modelos = modelos + get_best_gguf_models(limit=50, author="bartowski",
-                                                 modelt_filter="gguf", short="lastModified")
+        modelos =get_best_gguf_models(limit=50,author="unsloth",modelt_filter="gguf")
+        # modelos = modelos + get_best_gguf_models(limit=10, author="unsloth",
+        #                                          modelt_filter="gguf", short="lastModified")
+        # modelos = modelos + get_best_gguf_models(limit=50, author="bartowski",
+        #                                          modelt_filter="gguf", short="lastModified")
         models_to_test =modelos+get_best_gguf_models(limit=50,author="bartowski",modelt_filter="gguf")
     else:
         models_to_test = get_best_gguf_models(limit=1, completed_models=completed_models,  max_size=1)
@@ -530,39 +530,6 @@ def main():
 
     generate_global_leaderboard(models_root_dir, args.backend)
 
-def release_unity_license():
-    print("🔓 Liberando licença Unity...")
-
-    try:
-        subprocess.run([
-            "/opt/Unity/Unity",
-            "-quit",
-            "-batchmode",
-            "-nographics",
-            "-returnlicense",
-            os.environ.get("UNITY_SERIAL"),
-            "-username", os.environ.get("UNITY_EMAIL"),
-            "-password", os.environ.get("UNITY_PASSWORD"),
-            "-logFile", "/app/artifacts/return-log.txt"
-        ], timeout=30)
-    except Exception as e:
-        print(f"⚠️ Falha ao liberar licença Unity: {e}")
-
-def cleanup():
-    try:
-        print("🧹 Cleanup global iniciado...")
-        release_unity_license()
-    except Exception as e:
-        print(f"⚠️ Cleanup falhou: {e}")
-atexit.register(cleanup)
-
-def handler(signum, frame):
-    cleanup()
-    exit(0)
-
-signal.signal(signal.SIGTERM, handler)
-signal.signal(signal.SIGHUP, handler)
-signal.signal(signal.SIGINT, handler)
 
 if __name__ == "__main__":
     main()

@@ -52,42 +52,21 @@ export SINGULARITY_TMPDIR="$SCRATCH_DIR/.singularity/tmp"
 mkdir -p "$SINGULARITY_CACHEDIR" "$SINGULARITY_TMPDIR"
 
 # =====================================================================
-# LÓGICA DE CAPTURA DE SINAL (TRAP) PARA DEVOLUÇÃO DA LICENÇA
-# =====================================================================
-devolver_licenca() {
-    echo "⚠️ [SLURM] Sinal de cancelamento ou Timeout detectado!"
-    echo "🔓 Devolvendo licença Unity de forma segura antes do nó fechar..."
-    
-    # Como a Unity está dentro do container, executamos um comando rápido nela
-    singularity exec --nv --writable-tmpfs \
-      --bind "$ARTIFACTS_DIR":/app/artifacts \
-      "$SCRATCH_DIR/unity-vllm-bench.sif" \
-      /opt/Unity/Unity -quit -batchmode -nographics \
-      -returnlicense "$UNITY_SERIAL" \
-      -username "$UNITY_EMAIL" \
-      -password "$UNITY_PASSWORD" \
-      -logFile /app/artifacts/return-log.txt
-
-    echo "✅ Licença devolvida com sucesso. Encerrando o Job."
-    exit 0
-}
-
-# Registra a função para rodar se o SLURM mandar o aviso de tempo (USR1) ou cancelamento (TERM)
-trap 'devolver_licenca' TERM INT EXIT USR1
-# =====================================================================
 
 # =====================================================================
 # LÓGICA SLURM DE AUTO-REEXECUÇÃO POR TIMEOUT OU CRASH
 # =====================================================================
 CURRENT_JOB_ID=$SLURM_JOB_ID
 
-if [ -f "$ARTIFACTS_DIR/NO_MORE_MODELS.flag" ]; then
-    echo "🏁 Todos os modelos elegíveis foram processados. Fim das auto-submissões."
-else
-    echo "🔄 Criando gatilho de segurança no SLURM..."
-    echo "    Se este Job ($CURRENT_JOB_ID) estourar as 12 horas ou crashar, o próximo assume dinamicamente."
-    sbatch --dependency=afternotok:$CURRENT_JOB_ID "$0"
-fi
+MAPPED_PARTITION=$SLURM_JOB_PARTITION
+
+echo "🛰️ [PIPELINE] Job iniciado na partição: $MAPPED_PARTITION"
+
+# 🪤 O PULO DO GATO CORRIGIDO:
+# Forçamos o script de limpeza a herdar a EXATA mesma partição do job pai (--partition)
+echo "🔗 Vinculando script de limpeza para rodar na mesma partição após o término..."
+sbatch --dependency=afterany:$CURRENT_JOB_ID --partition=$MAPPED_PARTITION cleanandrun.sbatch
+
 # =====================================================================
 
 echo "========================================================="
@@ -107,8 +86,6 @@ singularity exec --nv --writable-tmpfs \
   "$SCRATCH_DIR/unity-vllm-bench.sif" /app/pipeline.sh
 status=$?
 
-devolver_licenca
-
-exit $status
+wait $status
 
 echo "✅ Bloco de execução finalizado com sucesso!"

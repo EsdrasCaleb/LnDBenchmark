@@ -26,21 +26,29 @@ echo -n ' -> Memória Máxima do Container (Cgroups): '
 echo '=================================================='
 
 # Função para garantir a limpeza do ambiente e a correção das permissões
+CLEANED=0
+
 cleanup() {
-    echo "cleanup"
-
-    kill -TERM "$PID" 2>/dev/null
-    echo '🔓 Ajustando permissões de saída nos artefatos...'
-    if [ -n "$USER_UID" ] && [ -n "$USER_GID" ]; then
-        chown -R "$USER_UID":"$USER_GID" /app/artifacts || true
-        chown -R "$USER_UID":"$USER_GID" /app/project || true
+    if [ "$CLEANED" -eq 1 ]; then
+        return
     fi
+    CLEANED=1
 
-    # Devolve a licença no final de tudo de forma segura
-    echo '🔓 Devolvendo licença Unity de forma segura...'
-    /opt/Unity/Unity -quit -batchmode -nographics -returnlicense "$UNITY_SERIAL" -username "$UNITY_EMAIL" -password "$UNITY_PASSWORD" -logFile /app/artifacts/return-log.txt
+    echo "🧹 encerrando python"
+    kill -TERM "$PID" 2>/dev/null || true
+    wait "$PID" 2>/dev/null || true
+
+    echo "🔓 devolvendo licença unity"
+    /opt/Unity/Unity \
+        -quit -batchmode -nographics \
+        -returnlicense \
+        "$UNITY_SERIAL" \
+        -username "$UNITY_EMAIL" \
+        -password "$UNITY_PASSWORD" \
+        -logFile /app/artifacts/return-log.txt || true
 }
-trap cleanup TERM INT EXIT
+
+trap cleanup TERM INT
 
 # --------------------------------------------------
 # INICIALIZAÇÃO DA UNITY
@@ -58,3 +66,5 @@ PYTHONUNBUFFERED=1 python3 /app/orchestrator.py &
 PID=$!
 
 wait $PID
+
+cleanup
