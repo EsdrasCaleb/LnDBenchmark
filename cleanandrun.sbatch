@@ -9,6 +9,32 @@
 #SBATCH --mem=8G
 #SBATCH --partition=gpu-4-h200,gpu-8-h100,gpu-4-a100,gpu-8-v100  # Roda na mesma partição disponível
 
+
+
+# 1. CARREGAMENTO INTELIGENTE DO .ENV
+# Lemos linha por linha para evitar quebras por causa de espaços ou aspas
+if [ -f ".env" ]; then
+    echo "📋 Carregando e exportando variáveis do .env para o Singularity..."
+    while IFS= read -r line || [ -n "$line" ]; do
+        # Ignora linhas vazias e comentários
+        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+        [[ -z "${line//[:space:]/}" ]] && continue
+
+        # Limpa espaços ao redor do '=' e remove aspas extras do valor
+        key=$(echo "$line" | cut -d= -f1 | xargs)
+        val=$(echo "$line" | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+
+        # Exporta localmente para o Slurm usar (ex: PROJECT_PATH)
+        export "$key"="$val"
+
+        # A MÁGICA: Exporta com o prefixo que o Singularity injeta AUTOMATICAMENTE no container
+        export "SINGULARITYENV_$key"="$val"
+    done < ".env"
+else
+    echo "❌ Erro: Arquivo .env não encontrado em $HOME"
+    exit 1
+fi
+
 # 📁 Carregue suas variáveis de ambiente/caminhos aqui (ou faça um source no seu env.sh)
 # source /app/projeto/definicoes_ambiente.sh
 ARTIFACTS_DIR="/app/artifacts"
