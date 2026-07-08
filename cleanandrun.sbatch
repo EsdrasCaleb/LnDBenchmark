@@ -37,7 +37,7 @@ fi
 
 # 📁 Carregue suas variáveis de ambiente/caminhos aqui (ou faça um source no seu env.sh)
 # source /app/projeto/definicoes_ambiente.sh
-ARTIFACTS_DIR="/app/artifacts"
+ARTIFACTS_DIR="unity_artifacts"
 SCRATCH_DIR="../scratch"
 PIPELINE_SCRIPT="pipeline.sbatch"  # Nome do seu script principal
 
