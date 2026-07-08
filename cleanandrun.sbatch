@@ -39,7 +39,7 @@ fi
 # source /app/projeto/definicoes_ambiente.sh
 ARTIFACTS_DIR="unity_artifacts"
 SCRATCH_DIR="../scratch"
-PIPELINE_SCRIPT="pipeline.sbatch"  # Nome do seu script principal
+PIPELINE_SCRIPT="run_benchmark.sbatch"  # Nome do seu script principal
 
 echo "🔓 [CLEANUP] Iniciando processo de devolução de licença Unity..."
 
