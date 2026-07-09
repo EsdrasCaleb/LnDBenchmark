@@ -16,6 +16,7 @@ import os
 import pandas as pd
 import atexit
 import signal
+from multiprocessing import Process, Queue
 
 
 def generate_global_leaderboard(models_root_dir, backend_name):
@@ -459,14 +460,44 @@ def main():
             # 🎯 Aponta para o caminho que mapeamos no Singularity (--bind)
             scratch_download_dir = "/app/scratch_models"
 
-            local_path = hf_hub_download(
-                repo_id=target["repo_id"],
-                filename=target["filename"],
-                token=os.environ.get("HF_TOKEN"),
-                local_dir=scratch_download_dir,
-                local_dir_use_symlinks=False,
-                resume_download=False
-            )
+            MAX_RETRIES = 5
+            TIMEOUT = 3600  # 1 hora
+
+            local_path = None
+
+            for tentativa in range(1, MAX_RETRIES + 1):
+                print(f"Tentativa {tentativa}/{MAX_RETRIES}")
+
+                queue = Queue()
+                p = Process(
+                    target=download_worker,
+                    args=(queue, target, scratch_download_dir)
+                )
+
+                p.start()
+                p.join(TIMEOUT)
+
+                if p.is_alive():
+                    print("⚠️ Timeout. Matando processo...")
+                    p.terminate()
+                    p.join()
+                    continue
+
+                if queue.empty():
+                    print("⚠️ Processo terminou sem retornar resultado.")
+                    continue
+
+                status, result = queue.get()
+
+                if status == "ok":
+                    local_path = result
+                    break
+
+                print(result)
+
+            if local_path is None:
+                print("❌ Não foi possível baixar o modelo.")
+                continue
 
             # Print de debug para você monitorar no log se ele está indo para o lugar certo
             print(f"📍 Arquivo localizado em: {local_path}")
