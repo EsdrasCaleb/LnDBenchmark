@@ -111,6 +111,19 @@ def generate_global_leaderboard(models_root_dir, backend_name):
         print(f"\n👑 RANKING FINAL DE QUALIDADE E PERFORMANCE ({backend_name.upper()}):")
         print(leaderboard_df.to_string(index=False))
 
+def download_worker(queue, target, scratch_download_dir):
+    try:
+        path = hf_hub_download(
+            repo_id=target["repo_id"],
+            filename=target["filename"],
+            token=os.environ.get("HF_TOKEN"),
+            local_dir=scratch_download_dir,
+            local_dir_use_symlinks=False,
+            resume_download=True,
+        )
+        queue.put(("ok", path))
+    except Exception as e:
+        queue.put(("error", str(e)))
 
 # =====================================================================
 # 🎮 PIPELINE DA ENGINE UNITY
