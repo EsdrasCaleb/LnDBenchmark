@@ -110,8 +110,6 @@ for idx, item in enumerate(modelos, 1):
             filename=filename,
             token=os.environ.get("HF_TOKEN"),
             local_dir=DEST_DIR,
-            local_dir_use_symlinks=False,  # Grava o arquivo direto no scratch físico
-            resume_download=True           # Caso a rede oscile, continua de onde parou
         )
         print(f"✅ Concluído! Salvo em: {local_path}")
     except Exception as e:
