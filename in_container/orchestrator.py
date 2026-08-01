@@ -444,7 +444,7 @@ def main():
         #                                          modelt_filter="gguf", short="lastModified")
         # modelos = modelos + get_best_gguf_models(limit=50, author="bartowski",
         #                                          modelt_filter="gguf", short="lastModified")
-        models_to_test =get_best_gguf_models(limit=200,author="bartowski",modelt_filter="gguf",max_size=2, short="lastModified")
+        models_to_test =get_best_gguf_models(limit=200,author="mradermacher",modelt_filter="gguf",max_size=2, short="lastModified")
     else:
         models_to_test = get_best_gguf_models(limit=1, completed_models=completed_models,  max_size=1)
 
