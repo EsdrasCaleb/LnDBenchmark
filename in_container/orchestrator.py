@@ -86,23 +86,58 @@ def generate_global_leaderboard(models_root_dir, backend_name):
     if all_reports:
         leaderboard_df = pd.concat(all_reports, ignore_index=True)
 
-        # Garante a tipagem das colunas numéricas originais e das novas colunas
+        # 1. Garante tipagem numérica de todas as colunas relevantes
         numeric_cols = [
-            "editmodetestpassing", "playmodetestspassing", "coveredlines"
+            "editmodetestpassing", "playmodetestspassing", "coveredlines", "total_gen_time(s)"
         ]
         for col in numeric_cols:
             if col in leaderboard_df.columns:
                 leaderboard_df[col] = pd.to_numeric(leaderboard_df[col], errors='coerce').fillna(0)
 
-        # Ordenação do ranking principal (Critério: Testes passando -> Linhas cobertas -> Menor tempo)
-        sort_by = ["editmodetestpassing","playmodetestspassing", "coveredlines"]
-        ascending_rules = [False,False, False]  # Menos tempo de geração é melhor em caso de empate
+        # 2. Cria métricas auxiliares para ranqueamento justo
+        # Trava: Exige pelo menos 1 teste em Edit E 1 teste em Play
+        leaderboard_df["passes_both_modes"] = (
+                (leaderboard_df["editmodetestpassing"] > 0) &
+                (leaderboard_df["playmodetestspassing"] > 0)
+        )
 
-        # Filtra apenas colunas existentes para evitar erros de ordenação
-        sort_by = [col for col in sort_by if col in leaderboard_df.columns]
-        ascending_rules = ascending_rules[:len(sort_by)]
+        # Total absoluto de testes passando (Edit + Play)
+        leaderboard_df["total_tests_passing"] = (
+                leaderboard_df["editmodetestpassing"] + leaderboard_df["playmodetestspassing"]
+        )
 
-        leaderboard_df = leaderboard_df.sort_values(by=sort_by, ascending=ascending_rules)
+        # Equilibrio: Pega o menor valor entre Edit e Play para priorizar modelos consistentes
+        leaderboard_df["min_tests_passing"] = leaderboard_df[
+            ["editmodetestpassing", "playmodetestspassing"]
+        ].min(axis=1)
+
+        # 3. Regras de Ordenação Hierárquica
+        sort_cols = [
+            "passes_both_modes",  # 1º: Passou nos dois modos? (True vem antes de False)
+            "total_tests_passing",  # 2º: Maior soma total de testes aprovados
+            "min_tests_passing",  # 3º: Maior equilíbrio entre edit/play
+            "coveredlines",  # 4º: Maior cobertura de linhas
+            "total_gen_time(s)"  # 5º: Menor tempo total de geração (desempate)
+        ]
+
+        ascending_rules = [False, False, False, False, True]
+
+        # Filtra apenas colunas existentes no DataFrame
+        valid_sort = []
+        valid_asc = []
+        for col, asc in zip(sort_cols, ascending_rules):
+            if col in leaderboard_df.columns:
+                valid_sort.append(col)
+                valid_asc.append(asc)
+
+        # Aplica a ordenação
+        leaderboard_df = leaderboard_df.sort_values(by=valid_sort, ascending=valid_asc)
+
+        # Limpa as colunas auxiliares para manter a estrutura original do relatório
+        leaderboard_df = leaderboard_df.drop(
+            columns=["passes_both_modes", "total_tests_passing", "min_tests_passing"],
+            errors="ignore"
+        )
 
         # Salva o arquivo unificado final em disco
         output_path = "/app/artifacts/GLOBAL_LEADERBOARD.csv"
@@ -444,7 +479,9 @@ def main():
         #                                          modelt_filter="gguf", short="lastModified")
         # modelos = modelos + get_best_gguf_models(limit=50, author="bartowski",
         #                                          modelt_filter="gguf", short="lastModified")
-        models_to_test =get_best_gguf_models(limit=200,author="mradermacher",modelt_filter="gguf",max_size=2, short="lastModified")
+        #models_to_test =get_best_gguf_models(limit=200,author="mradermacher",modelt_filter="gguf",max_size=2, short="lastModified")
+        models_to_test = get_best_gguf_models(limit=200, author="bartowski", modelt_filter="gguf", max_size=2,
+                                              short="lastModified")
     else:
         models_to_test = get_best_gguf_models(limit=1, completed_models=completed_models,  max_size=1)
 
