@@ -470,7 +470,7 @@ def main():
     print("🦙 MODO SELECIONADO: PIPELINE LLAMA.CPP (Modelos GGUF compactos)")
     has_gpu = os.environ.get("HAS_GPU", "false").lower() == "true"
     if has_gpu:
-        # get_best_gguf_models(limit=0,model_search="code",modelt_filter="gguf",max_size=4,oder_size=False) 
+        # get_best_gguf_models(limit=0,model_search="code",modelt_filter="gguf",max_size=4,oder_size=False)
         # get_best_gguf_models(limit=7,model_search="code",modelt_filter="gguf",max_size=12,oder_size=False)
         # models_to_test = get_best_gguf_models(limit=0, completed_models=completed_models, days_old=999,
         #                                       model_search="unity", modelt_filter=["gguf"], max_size=4.1)    
@@ -482,8 +482,23 @@ def main():
         #models_to_test =get_best_gguf_models(limit=200,author="mradermacher",modelt_filter="gguf",max_size=2, short="lastModified")
         # models_to_test = get_best_gguf_models(limit=200, author="bartowski", modelt_filter="gguf", max_size=2,
         #                                       short="lastModified")
-        models_to_test = get_best_gguf_models(limit=200, modelt_filter="gguf", max_size=2,
-                                              short="lastModified")
+        # models_to_test = get_best_gguf_models(limit=200, modelt_filter="gguf", max_size=2,
+        #                                       short="lastModified")
+        m_qwen_rec = get_best_gguf_models(limit=1, author="bartowski", model_search="Qwen3.5-35B", max_size=40.0,
+                                          modelt_filter=["gguf"])
+        m_qwen32 = get_best_gguf_models(limit=1, author="bartowski", model_search="Qwen2.5-Coder-32B-Instruct",
+                                        max_size=40.0, modelt_filter=["gguf"])
+        m_qwen14 = get_best_gguf_models(limit=1, author="bartowski", model_search="Qwen2.5-Coder-14B-Instruct",
+                                        max_size=20.0, modelt_filter=["gguf"])
+        m_code22 = get_best_gguf_models(limit=1, author="bartowski", model_search="Codestral-22B-v0.1", max_size=28.0,
+                                        modelt_filter=["gguf"])
+        m_deep16 = get_best_gguf_models(limit=1, author="bartowski", model_search="DeepSeek-Coder-V2-Lite-Instruct",
+                                        max_size=20.0, modelt_filter=["gguf"])
+        m_devs24 = get_best_gguf_models(limit=1, author="bartowski", model_search="Mistral-Small-24B-Instruct-2501",
+                                        max_size=28.0, modelt_filter=["gguf"])
+
+        # 2. Unifica todas as chamadas em uma única lista
+        models_to_test =m_qwen_rec+ m_qwen32 + m_qwen14 + m_code22 + m_deep16 + m_devs24
     else:
         models_to_test = get_best_gguf_models(limit=1, completed_models=completed_models,  max_size=1)
 
