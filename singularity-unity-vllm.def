@@ -12,6 +12,7 @@ From: nvidia/cuda:12.6.3-devel-ubuntu22.04
 
 %files
     /home/caleb/gameprojects/unityprojects/LnDBenchmark/unity_installs/Unity-6000.3.11f1.tar.xz /opt/installers/unity.tar.xz
+    /home/caleb/gameprojects/unityprojects/LnDBenchmark/unity_installs/llama-b11146-bin-ubuntu-cuda-12.8-x64.tar.gz /opt/installers/llama.tar.gz
     in_container/orchestrator.py /app/orchestrator.py
     in_container/parse_results.py /app/parse_results.py
     in_container/utils.py /app/utils.py
@@ -20,7 +21,7 @@ From: nvidia/cuda:12.6.3-devel-ubuntu22.04
 %post
     export DEBIAN_FRONTEND=noninteractive
 
-    # 1. Atualização de pacotes e dependências (incluindo git, cmake e build-essential)
+    # 1. Atualização de pacotes e dependências essenciais
     apt-get update && apt-get install -y --no-install-recommends \
         python3 \
         python3-pip \
@@ -34,7 +35,6 @@ From: nvidia/cuda:12.6.3-devel-ubuntu22.04
         ca-certificates \
         xxd \
         build-essential \
-        cmake \
         libgl1-mesa-glx \
         libgl1-mesa-dri \
         libglib2.0-0 \
@@ -62,9 +62,6 @@ From: nvidia/cuda:12.6.3-devel-ubuntu22.04
         -C /opt/Unity \
         --strip-components=1
 
-    rm -rf /opt/installers
-    rm -f /tmp/unity.tar.xz
-
     # 3. Python venv e pacotes necessários
     python3 -m venv /opt/venv
     /opt/venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel
@@ -75,66 +72,25 @@ From: nvidia/cuda:12.6.3-devel-ubuntu22.04
         psutil \
         nvidia-ml-py
 
-   # 🔥 4. COMPILAÇÃO NATIVA DO LLAMA.CPP COM SUPORTE A CUDA 12
+    # ⚡ 4. INSTALAÇÃO LOCAL DO LLAMA.CPP A PARTIR DO PACOTE PRÉ-BAIXADO
     echo "========================================================="
-    echo "🔨 Preparando e Compilando llama.cpp nativo com CUDA 12..."
+    echo "⚡ Extraindo llama.cpp do arquivo local..."
     echo "========================================================="
     
-    # 🔗 Solução para o Linker: Cria um link simbólico do stub no path padrão do sistema
-    # Isso resolve o erro de dependência oculta da libggml-cuda.so
-    ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/lib/x86_64-linux-gnu/libcuda.so.1
+    mkdir -p /tmp/llama_extract
+    tar -xzf /opt/installers/llama.tar.gz -C /tmp/llama_extract
 
-    export LDFLAGS="-L/usr/local/cuda/lib64/stubs -Wl,-rpath-link,/usr/local/cuda/lib64/stubs"
-    export LIBRARY_PATH="/usr/local/cuda/lib64/stubs:${LIBRARY_PATH}"
+    # Move executáveis (llama-server, llama-cli, etc.) para /usr/local/bin
+    find /tmp/llama_extract -type f -executable -exec cp -f {} /usr/local/bin/ \;
 
-    cd /tmp
-    if [ -d "llama.cpp" ]; then
-        echo "📂 Diretório existente encontrado. Limpando para recomeçar..."
-        cd llama.cpp
-        git reset --hard
-        git clean -fdx
-        git checkout b9673
-    else
-        echo "📥 Clonando nova cópia do repositório..."
-        git clone --depth 1 --branch b9673 https://github.com/ggml-org/llama.cpp.git
-        cd llama.cpp
-    fi
-
-    rm -rf build && mkdir build
-    cd build
-
-    # Adicionado -DCMAKE_EXE_LINKER_FLAGS para embutir o caminho do stub nos binários internos do build
-    cmake .. \
-        -DGGML_CUDA=ON \
-        -DCMAKE_INSTALL_PREFIX=/opt/llama-binaries \
-        -DCMAKE_C_FLAGS="-march=x86-64-v3 -O3" \
-        -DCMAKE_CXX_FLAGS="-march=x86-64-v3 -O3" \
-        -DCMAKE_CUDA_ARCHITECTURES="70;80;90" \
-        -DGGML_CUDA_F16=ON \
-        -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath-link,/usr/local/cuda/lib64/stubs"
-
-    # Compila usando todos os núcleos da máquina
-    cmake --build . --config Release -j$(nproc)
-
-    # Organiza os arquivos finais na pasta /opt/llama-binaries
-    echo "📦 Instalando binários limpos em /opt/llama-binaries..."
-    cmake --install .
-
-    # Copia o conteúdo estruturado para o path global do container
-    cp /opt/llama-binaries/bin/* /usr/local/bin/
-    
-    if [ -d "/opt/llama-binaries/lib" ]; then
-        cp -r /opt/llama-binaries/lib/* /usr/local/lib/ 2>/dev/null || true
-    fi
-    if [ -d "/opt/llama-binaries/lib64" ]; then
-        cp -r /opt/llama-binaries/lib64/* /usr/local/lib/ 2>/dev/null || true
-    fi
-
-    # 🧼 Limpeza: Remove o link simbólico fake para que no cluster ele use o driver real da GPU
-    rm -f /usr/lib/x86_64-linux-gnu/libcuda.so.1
+    # Copia bibliotecas compartilhadas (.so*) para /usr/local/lib
+    find /tmp/llama_extract -type f -name "*.so*" -exec cp -f {} /usr/local/lib/ \;
 
     ldconfig || true
-    rm -rf /tmp/llama.cpp
+
+    # 5. Limpeza de instaladores e temporários
+    rm -rf /opt/installers
+    rm -rf /tmp/llama_extract
 
     # Limpeza do gerenciador de pacotes
     apt-get clean
