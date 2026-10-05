@@ -46,7 +46,7 @@ singularity exec --nv --writable-tmpfs \
   --bind ./in_container:/app \
   --bind ./npad_artifacts:/app/artifacts \
   --bind "$HF_CACHE_DIR":/tmp/huggingface \
-  "$SCRATCH_DIR/unity-vllm-bench.sif" /bin/bash -c "
+  "$HOME/unity-vllm-bench.sif" /bin/bash -c "
 
     # 🔥 Força o Python a cuspir logs em tempo real
     export PYTHONUNBUFFERED=1

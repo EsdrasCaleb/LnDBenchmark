@@ -46,7 +46,7 @@ echo "🔓 [CLEANUP] Iniciando processo de devolução de licença Unity..."
 # Executa o comando que você definiu para liberar a licença na nuvem da Unity
 singularity exec --nv --writable-tmpfs \
   --bind "$ARTIFACTS_DIR":/app/artifacts \
-  "$SCRATCH_DIR/unity-vllm-bench.sif" \
+  "$HOME/unity-vllm-bench.sif" \
   /opt/Unity/Unity -quit -batchmode -nographics \
   -returnlicense "$UNITY_SERIAL" \
   -username "$UNITY_EMAIL" \

@@ -5,9 +5,9 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
-#SBATCH --partition=gpu-4-h200,gpu-8-h100,gpu-4-a100
+#SBATCH --partition=gpu-4-h200,gpu-8-h100,gpu-4-a100,gpu-8-v100
 #SBATCH --time=72:00:00         
-#SBATCH --mem=45G
+#SBATCH --mem=20G
 #SBATCH --gres=gpu:1
 #SBATCH --signal=B:TERM@60
 
@@ -64,8 +64,8 @@ echo "🛰️ [PIPELINE] Job iniciado na partição: $MAPPED_PARTITION"
 
 # 🪤 O PULO DO GATO CORRIGIDO:
 # Forçamos o script de limpeza a herdar a EXATA mesma partição do job pai (--partition)
-echo "🔗 Vinculando script de limpeza para rodar na mesma partição após o término..."
-sbatch --dependency=afterany:$CURRENT_JOB_ID --partition=$MAPPED_PARTITION cleanandrun.sbatch
+#echo "🔗 Vinculando script de limpeza para rodar na mesma partição após o término..."
+#sbatch --dependency=afterany:$CURRENT_JOB_ID --partition=$MAPPED_PARTITION cleanandrun.sbatch
 
 # =====================================================================
 
@@ -83,7 +83,7 @@ singularity exec --nv --writable-tmpfs \
   --bind ./in_container/orchestrator.py:/app/orchestrator.py \
   --bind ./in_container/utils.py:/app/utils.py \
   --bind ./in_container/pipeline.sh:/app/pipeline.sh \
-  "$SCRATCH_DIR/unity-vllm-bench.sif" /app/pipeline.sh
+  "$HOME/unity-vllm-bench.sif" /app/pipeline.sh
 status=$?
 
 wait $status
