@@ -64,8 +64,8 @@ echo "🛰️ [PIPELINE] Job iniciado na partição: $MAPPED_PARTITION"
 
 # 🪤 O PULO DO GATO CORRIGIDO:
 # Forçamos o script de limpeza a herdar a EXATA mesma partição do job pai (--partition)
-echo "🔗 Vinculando script de limpeza para rodar na mesma partição após o término..."
-sbatch --dependency=afterany:$CURRENT_JOB_ID --partition=$MAPPED_PARTITION cleanandrun.sbatch
+#echo "🔗 Vinculando script de limpeza para rodar na mesma partição após o término..."
+#sbatch --dependency=afterany:$CURRENT_JOB_ID --partition=$MAPPED_PARTITION cleanandrun.sbatch
 
 # =====================================================================
 
