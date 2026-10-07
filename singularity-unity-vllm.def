@@ -1,5 +1,5 @@
 Bootstrap: docker
-From: nvidia/cuda:12.8.0-devel-ubuntu24.04
+From: nvidia/cuda:12.6.3-devel-ubuntu22.04
 
 %environment
     export DEBIAN_FRONTEND=noninteractive
@@ -12,7 +12,6 @@ From: nvidia/cuda:12.8.0-devel-ubuntu24.04
 
 %files
     /home/caleb/gameprojects/unityprojects/LnDBenchmark/unity_installs/Unity-6000.3.11f1.tar.xz /opt/installers/unity.tar.xz
-    /home/caleb/gameprojects/unityprojects/LnDBenchmark/unity_installs/llama-b11146-bin-ubuntu-cuda-12.8-x64.tar.gz /opt/installers/llama.tar.gz
     in_container/orchestrator.py /app/orchestrator.py
     in_container/parse_results.py /app/parse_results.py
     in_container/utils.py /app/utils.py
@@ -21,7 +20,7 @@ From: nvidia/cuda:12.8.0-devel-ubuntu24.04
 %post
     export DEBIAN_FRONTEND=noninteractive
 
-    # 1. Atualização de pacotes e dependências (Ajustadas para Ubuntu 24.04)
+    # 1. Atualização de pacotes e dependências (incluindo git, cmake e build-essential)
     apt-get update && apt-get install -y --no-install-recommends \
         python3 \
         python3-pip \
@@ -35,6 +34,8 @@ From: nvidia/cuda:12.8.0-devel-ubuntu24.04
         ca-certificates \
         xxd \
         build-essential \
+        cmake \
+        gzip \
         libgl1-mesa-glx \
         libgl1-mesa-dri \
         libglib2.0-0 \
@@ -42,7 +43,7 @@ From: nvidia/cuda:12.8.0-devel-ubuntu24.04
         libgconf-2-4 \
         libnss3 \
         libxss1 \
-        libasound2t64 \
+        libasound2 \
         libxtst6 \
         libxshmfence1 \
         libgbm1 \
@@ -54,13 +55,16 @@ From: nvidia/cuda:12.8.0-devel-ubuntu24.04
         libxi6 \
         libxkbcommon0 \
         libxkbcommon-x11-0 \
-        libsecret-1-0 || apt-get install -y --no-install-recommends libasound2
+        libsecret-1-0
 
     # 2. Extração do Unity
     mkdir -p /opt/Unity
     tar -xJf /opt/installers/unity.tar.xz \
         -C /opt/Unity \
         --strip-components=1
+
+    rm -rf /opt/installers
+    rm -f /tmp/unity.tar.xz
 
     # 3. Python venv e pacotes necessários
     python3 -m venv /opt/venv
@@ -72,27 +76,89 @@ From: nvidia/cuda:12.8.0-devel-ubuntu24.04
         psutil \
         nvidia-ml-py
 
-    # ⚡ 4. INSTALAÇÃO LOCAL DO LLAMA.CPP (Compatível com GLIBC 2.38 do Ubuntu 24.04)
+   # 🔥 4. COMPILAÇÃO NATIVA DO LLAMA.CPP COM SUPORTE A CUDA 12
     echo "========================================================="
-    echo "⚡ Extraindo llama.cpp do arquivo local..."
+    echo "🔨 Preparando e Compilando llama.cpp nativo com CUDA 12..."
     echo "========================================================="
     
-    mkdir -p /tmp/llama_extract
-    tar -xzf /opt/installers/llama.tar.gz -C /tmp/llama_extract
+    ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/lib/x86_64-linux-gnu/libcuda.so.1 2>/dev/null || true
 
-    # Move executáveis (llama-server, llama-cli, etc.) para /usr/local/bin
-    find /tmp/llama_extract -type f -executable -exec cp -f {} /usr/local/bin/ \;
+    export LDFLAGS="-L/usr/local/cuda/lib64/stubs -Wl,-rpath-link,/usr/local/cuda/lib64/stubs"
+    export LIBRARY_PATH="/usr/local/cuda/lib64/stubs:${LIBRARY_PATH}"
 
-    # Copia bibliotecas compartilhadas (.so*) para /usr/local/lib
-    find /tmp/llama_extract -type f -name "*.so*" -exec cp -f {} /usr/local/lib/ \;
+    cd /tmp
+    if [ -d "llama.cpp" ]; then
+        echo "📂 Diretório existente encontrado. Limpando para recomeçar..."
+        cd llama.cpp
+        git reset --hard
+        git checkout b9673
+    else
+        echo "📥 Clonando nova cópia do repositório..."
+        git clone --depth 1 --branch b9673 https://github.com/ggml-org/llama.cpp.git
+        cd llama.cpp
+    fi
+
+    rm -rf build && mkdir build
+    cd build
+
+    find /tmp/llama.cpp/build -type d -name "dist" | while read -r dist_dir; do
+        if [ -f "$dist_dir/index.html" ]; then
+            cp -fv "$dist_dir/index.html" "$dist_dir/loading.html"
+        fi
+        if [ -d "$dist_dir/_gzip" ] && [ -f "$dist_dir/loading.html" ]; then
+            gzip -c "$dist_dir/loading.html" > "$dist_dir/_gzip/loading.html.gz"
+        fi
+    done
+
+    cmake .. \
+        -DGGML_CUDA=ON \
+        -DLLAMA_BUILD_UI=OFF \
+        -DLLAMA_BUILD_WEBUI=OFF \
+        -DLLAMA_USE_PREBUILT_UI=OFF \
+        -DCMAKE_INSTALL_PREFIX=/opt/llama-binaries \
+        -DCMAKE_C_FLAGS="-march=x86-64-v3 -O3" \
+        -DCMAKE_CXX_FLAGS="-march=x86-64-v3 -O3" \
+        -DCMAKE_CUDA_ARCHITECTURES="70;80;90" \
+        -DGGML_CUDA_F16=ON \
+        -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath-link,/usr/local/cuda/lib64/stubs"
+
+    # 🚀 Tenta compilar. Se falhar por conta do loading.html faltante nos assets baixados:
+    if ! cmake --build . --config Release -j1; then
+        echo "========================================================="
+        echo "⚠️ UI assets incompletos no pacote HF. Injetando loading.html..."
+        echo "========================================================="
+
+        # Copia index.html para loading.html nas pastas de extração da UI
+        find /tmp/llama.cpp/build -type d -name "dist" | while read -r dist_dir; do
+            if [ -f "$dist_dir/index.html" ]; then
+                cp -fv "$dist_dir/index.html" "$dist_dir/loading.html"
+            fi
+            if [ -d "$dist_dir/_gzip" ] && [ -f "$dist_dir/loading.html" ]; then
+                gzip -c "$dist_dir/loading.html" > "$dist_dir/_gzip/loading.html.gz"
+            fi
+        done
+
+        # Re-executa o build com o arquivo injetado
+        cmake --build . --config Release -j1
+    fi
+
+    echo "📦 Instalando binários limpos em /opt/llama-binaries..."
+    cmake --install .
+
+    cp /opt/llama-binaries/bin/* /usr/local/bin/
+    
+    if [ -d "/opt/llama-binaries/lib" ]; then
+        cp -r /opt/llama-binaries/lib/* /usr/local/lib/ 2>/dev/null || true
+    fi
+    if [ -d "/opt/llama-binaries/lib64" ]; then
+        cp -r /opt/llama-binaries/lib64/* /usr/local/lib/ 2>/dev/null || true
+    fi
+
+    rm -f /usr/lib/x86_64-linux-gnu/libcuda.so.1
 
     ldconfig || true
+    rm -rf /tmp/llama.cpp
 
-    # 5. Limpeza de instaladores e temporários
-    rm -rf /opt/installers
-    rm -rf /tmp/llama_extract
-
-    # Limpeza do gerenciador de pacotes
     apt-get clean
     rm -rf /var/lib/apt/lists/*
 
