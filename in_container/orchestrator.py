@@ -484,6 +484,8 @@ def main():
         #                                       short="lastModified")
         # models_to_test = get_best_gguf_models(limit=200, modelt_filter="gguf", max_size=2,
         #                                       short="lastModified")
+        # models_to_test = get_best_gguf_models(limit=1, author="Qwen", model_search="Qwen2.5-Coder-7B-Instruct-GGUF", max_size=9.0,
+        #                                 modelt_filter=["gguf"],days_old=3065)
         m_qwen_rec = get_best_gguf_models(limit=1, author="bartowski", model_search="Qwen3.5-35B", max_size=40.0,
                                           modelt_filter=["gguf"],days_old=3065)
         m_qwen32 = get_best_gguf_models(limit=1, author="bartowski", model_search="Qwen2.5-Coder-32B-Instruct",
@@ -501,8 +503,7 @@ def main():
 
         # 2. Unifica todas as chamadas em uma única lista
         models_to_test = m_qwen14+ m_deep16 + m_code22 +m_code22trinity + m_devs24+m_qwen_rec+ m_qwen32
-        models_to_test = get_best_gguf_models(limit=1, author="Qwen", model_search="Qwen2.5-Coder-7B-Instruct-GGUF", max_size=9.0,
-                                        modelt_filter=["gguf"],days_old=3065)
+
     else:
         models_to_test = get_best_gguf_models(limit=1, completed_models=completed_models,  max_size=1)
 
