@@ -487,21 +487,21 @@ def main():
         # models_to_test = get_best_gguf_models(limit=1, author="Qwen", model_search="Qwen2.5-Coder-7B-Instruct-GGUF", max_size=9.0,
         #                                 modelt_filter=["gguf"],days_old=3065)
         m_codqwen = get_best_gguf_models(limit=1, author="Qwen", model_search="Qwen2.5-Coder-7B-Instruct-GGUF",
-                                              max_size=9.0, modelt_filter=["gguf"],days_old=3065)
+                                              max_size=9.0, modelt_filter=["gguf"],days_old=3065,completed_models=completed_models,)
         m_qwen_rec = get_best_gguf_models(limit=1, author="bartowski", model_search="Qwen3.5-35B", max_size=40.0,
-                                          modelt_filter=["gguf"],days_old=3065)
+                                          modelt_filter=["gguf"],days_old=3065,completed_models=completed_models,)
         m_qwen32 = get_best_gguf_models(limit=1, author="bartowski", model_search="Qwen2.5-Coder-32B-Instruct",
-                                        max_size=40.0, modelt_filter=["gguf"],days_old=3065)
+                                        max_size=40.0, modelt_filter=["gguf"],days_old=3065,completed_models=completed_models,)
         m_qwen14 = get_best_gguf_models(limit=1, author="bartowski", model_search="Qwen2.5-Coder-14B-Instruct",
-                                        max_size=20.0, modelt_filter=["gguf"],days_old=3065)
+                                        max_size=20.0, modelt_filter=["gguf"],days_old=3065,completed_models=completed_models,)
         m_code22 = get_best_gguf_models(limit=1, author="bartowski", model_search="Codestral-22B-v0.1", max_size=28.0,
-                                        modelt_filter=["gguf"],days_old=3065)
+                                        modelt_filter=["gguf"],days_old=3065,completed_models=completed_models,)
         m_code22trinity = get_best_gguf_models(limit=1, author="bartowski", model_search="Trinity-2-Codestral-22B-v0.2", max_size=28.0,
-                                        modelt_filter=["gguf"],days_old=3065)
+                                        modelt_filter=["gguf"],days_old=3065,completed_models=completed_models,)
         m_deep16 = get_best_gguf_models(limit=1, author="bartowski", model_search="DeepSeek-Coder-V2-Lite-Instruct",
-                                        max_size=20.0, modelt_filter=["gguf"],days_old=3065)
+                                        max_size=20.0, modelt_filter=["gguf"],days_old=3065,completed_models=completed_models,)
         m_devs24 = get_best_gguf_models(limit=1, author="bartowski", model_search="Mistral-Small-24B-Instruct-2501",
-                                        max_size=28.0, modelt_filter=["gguf"],days_old=3065)
+                                        max_size=28.0, modelt_filter=["gguf"],days_old=3065,completed_models=completed_models,)
 
         # 2. Unifica todas as chamadas em uma única lista
         models_to_test = m_codqwen + m_qwen14+ m_deep16 + m_code22 +m_code22trinity + m_devs24+m_qwen_rec+ m_qwen32

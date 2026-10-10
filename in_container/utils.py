@@ -433,7 +433,6 @@ def get_best_gguf_models(limit=5, completed_models=None,
     filtered_models = []
 
     for model in available_models:
-        model_id_lower = model.modelId.lower()
 
         model_id_lower = model.modelId.lower()
 
