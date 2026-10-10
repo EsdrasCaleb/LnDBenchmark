@@ -60,8 +60,6 @@ singularity exec --nv --writable-tmpfs \
 echo "✅ [CLEANUP] Comando de devolução executado. Verificando logs..."
 
 # 🎯 PASSO 2: INSPEÇÃO E AVALIAÇÃO DA FLAG
-echo "🔍 Conteúdo atual de $ARTIFACTS_DIR:"
-ls -la "$ARTIFACTS_DIR"
 
 FLAG_FILE="$ARTIFACTS_DIR/NO_MORE_MODELS.flag"
 

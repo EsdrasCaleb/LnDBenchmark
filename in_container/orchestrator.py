@@ -351,7 +351,7 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
 
 def run_llamacpp(local_model_path, identifier):
     kill_zombie_servers("58291")
-    """Inicia o servidor binário C++ nativo do Llama.cpp."""
+    """Inicia o servidor binário C++ nativo do Llama.cpp com validação em dois estágios (Health Check + Completion)."""
     has_gpu = os.environ.get("HAS_GPU", "false").lower() == "true"
 
     cmd = [
@@ -371,7 +371,7 @@ def run_llamacpp(local_model_path, identifier):
         print(f"🚀 Subindo Llama-Server (C++) para: {identifier} [Modo: CPU Nativo]")
         cmd += ["-ngl", "0"]
 
-    # 📂 Gerenciamento Centralizado de Logs em uma pasta dedicada da Unity Artifacts
+    # 📂 Gerenciamento Centralizado de Logs na Unity Artifacts
     logs_dir = "/app/artifacts/llamacpp_logs"
     os.makedirs(logs_dir, exist_ok=True)
 
@@ -384,9 +384,50 @@ def run_llamacpp(local_model_path, identifier):
 
     process = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, env=env)
 
-    time.sleep(5)
+    time.sleep(3)
 
-    warmup_url = "http://localhost:58291/v1/chat/completions"
+    health_url = "http://localhost:58291/health"
+    completion_url = "http://localhost:58291/v1/chat/completions"
+    session = requests.Session()
+
+    # =========================================================================
+    # ESTÁGIO 1: Health Check (Aguardando alocação VRAM/Carregamento do GGUF)
+    # =========================================================================
+    print(f"🔄 [Estágio 1/2] Aguardando alocação e inicialização do backend para {identifier}...")
+    max_retries = 150  # 150 tentativas x 2s = 300 segundos (5 minutos)
+    health_ok = False
+
+    for i in range(max_retries):
+        if process.poll() is not None:
+            print(f"❌ O Llama-Server crashou de imediato no boot. Detalhes salvos em: {log_file_path}")
+            process.wait()
+            log_file.close()
+            return None
+
+        try:
+            res = session.get(health_url, timeout=5)
+            if res.status_code == 200:
+                print("🟢 [Estágio 1/2] Backend HTTP online e modelo alocado com sucesso!")
+                health_ok = True
+                break
+            elif res.status_code == 503:
+                if (i + 1) % 5 == 0 or i == 0:
+                    print(f"⏳ Alocando VRAM/Tensores... ({i + 1}/{max_retries}) Status HTTP 503 (Loading)")
+        except requests.exceptions.RequestException:
+            if (i + 1) % 5 == 0 or i == 0:
+                print(f"⏳ Subindo processo Llama-Server... ({i + 1}/{max_retries}) Socket fechado")
+
+        time.sleep(2)
+
+    if not health_ok:
+        print("❌ Timeout (Estágio 1): O Llama-Server demorou mais de 5 minutos para carregar o modelo.")
+        _terminate_process(process, log_file)
+        return None
+
+    # =========================================================================
+    # ESTÁGIO 2: Completion Warmup Check (Sanity Test de 1 Token)
+    # =========================================================================
+    print("🔄 [Estágio 2/2] Executando inferência de sanidade (1 token)...")
     payload = {
         "model": "vllmModel",
         "messages": [{"role": "user", "content": "hi"}],
@@ -394,37 +435,18 @@ def run_llamacpp(local_model_path, identifier):
         "temperature": 0.0
     }
 
-    print(f"🔄 Aguardando inicialização do backend para {identifier}...")
-    max_retries = 20
-    session = requests.Session()
-
-    for i in range(max_retries):
-        if process.poll() is not None:
-            print(f"❌ O Llama-Server crashou de imediato. Detalhes salvos em: {log_file_path}")
-            process.wait()
-            log_file.close()
-            return None
-
-        try:
-            response = session.post(warmup_url, json=payload, timeout=60)
-            if response.status_code == 200:
-                print("🟢 Llama-Server nativo online e integrado com sucesso!")
-                log_file.close()
-                return process
-        except Exception as err:
-            # Renomeado para 'err' evitando colisões locais de escopo no interpretador
-            print(f"⏳ Alocando tensores... ({i + 1}/{max_retries}) Status: Aguardando resposta do Servidor C++")
-
-        time.sleep(2)
-
-    print(f"❌ Timeout: O Llama-Server congelou ou demorou demais para responder.")
-    process.terminate()
     try:
-        process.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        process.kill()
+        response = session.post(completion_url, json=payload, timeout=60)
+        if response.status_code == 200:
+            print("🟢 [Estágio 2/2] Inferência de teste concluída com sucesso! Servidor C++ pronto para o Unity.")
+            log_file.close()
+            return process
+        else:
+            print(f"❌ Erro na inferência de teste (Estágio 2): Status {response.status_code} - {response.text}")
+    except Exception as err:
+        print(f"❌ Exceção na inferência de teste (Estágio 2): {err}")
 
-    log_file.close()
+    _terminate_process(process, log_file)
     return None
 
 # =====================================================================
