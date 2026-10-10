@@ -10,6 +10,10 @@
 #SBATCH --partition=gpu-4-h200,gpu-8-h100,gpu-4-a100,gpu-8-v100  # Roda na mesma partição disponível
 
 
+# 📍 FORÇA O DIRETÓRIO DE TRABALHO PARA O LOCAL DE SUBMISSÃO
+if [ -n "$SLURM_SUBMIT_DIR" ]; then
+    cd "$SLURM_SUBMIT_DIR"
+fi
 
 # 1. CARREGAMENTO INTELIGENTE DO .ENV
 # Lemos linha por linha para evitar quebras por causa de espaços ou aspas
@@ -55,7 +59,10 @@ singularity exec --nv --writable-tmpfs \
 
 echo "✅ [CLEANUP] Comando de devolução executado. Verificando logs..."
 
-# 🎯 Passo 2: Avaliar a Flag de Continuidade
+# 🎯 PASSO 2: INSPEÇÃO E AVALIAÇÃO DA FLAG
+echo "🔍 Conteúdo atual de $ARTIFACTS_DIR:"
+ls -la "$ARTIFACTS_DIR"
+
 FLAG_FILE="$ARTIFACTS_DIR/NO_MORE_MODELS.flag"
 
 if [ -f "$FLAG_FILE" ]; then
