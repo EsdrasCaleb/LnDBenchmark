@@ -4,11 +4,11 @@
 #SBATCH --error=npad_artifacts/slurm_error_%j.log
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --partition=gpu-4-h200,gpu-8-h100,gpu-4-a100
+#SBATCH --cpus-per-task=1
+#SBATCH --partition=gpu-4-h200,gpu-8-h100,gpu-4-a100,gpu-8-v100
 #SBATCH --time=72:00:00         
 #SBATCH --mem=60G
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:2
 #SBATCH --signal=B:TERM@60
 
 ARTIFACTS_DIR="unity_artifacts"
