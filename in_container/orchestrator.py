@@ -358,7 +358,7 @@ def run_llamacpp(local_model_path, identifier):
         "llama-server",
         "-m", local_model_path,
         "--port", "58291",
-        "-c", "2048",
+        "-c", "4096",
         "--alias", "vllmModel",
         "-ngl", "99",
         "-sm", "layer",  
