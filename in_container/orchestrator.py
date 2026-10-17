@@ -533,10 +533,12 @@ def main():
 
         # 2. Unifica todas as chamadas em uma única lista
         # models_to_test = m_codqwen + m_qwen14+ m_deep16 + m_code22 +m_code22trinity + m_devs24+m_qwen_rec+ m_qwen32
-        models_to_test = get_best_gguf_models(limit=70, short="likes",model_search="code",
+        # models_to_test = get_best_gguf_models(limit=70, short="likes",model_search="code",
+        #                                       max_size=30.0, modelt_filter=["gguf"], days_old=3065,
+        #                                       completed_models=completed_models,oder_size=False)
+        models_to_test = get_best_gguf_models(limit=70, short="likes",
                                               max_size=30.0, modelt_filter=["gguf"], days_old=3065,
-                                              completed_models=completed_models,oder_size=False)
-
+                                              completed_models=completed_models, oder_size=False)
     else:
         models_to_test = get_best_gguf_models(limit=1, completed_models=completed_models,  max_size=1)
 
