@@ -539,7 +539,7 @@ def main():
         # models_to_test = get_best_gguf_models(limit=70, short="likes",
         #                                       max_size=30.0, modelt_filter=["gguf"], days_old=3065,
         #                                       completed_models=completed_models, oder_size=False)
-        models_to_test = get_best_gguf_models(limit=10, model_search="code",
+        models_to_test = get_best_gguf_models(limit=30, model_search="code",
                                               max_size=30.0, modelt_filter=["gguf"], days_old=3065,
                                               completed_models=completed_models, oder_size=False)
     else:
