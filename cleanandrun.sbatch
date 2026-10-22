@@ -4,7 +4,8 @@
 #SBATCH --error=npad_artifacts/cleanup_error_%j.log
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=2
+#SBATCH --cpus-per-task=1
+#SBATCH --gres=gpu:1
 #SBATCH --time=00:15:00               # 15 minutos é mais que suficiente para devolver a licença
 #SBATCH --mem=8G
 #SBATCH --partition=gpu-4-h200,gpu-8-h100,gpu-4-a100,gpu-8-v100  # Roda na mesma partição disponível
