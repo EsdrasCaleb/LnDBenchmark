@@ -148,15 +148,28 @@ def generate_global_leaderboard(models_root_dir, backend_name):
 
 def download_worker(queue, target, scratch_download_dir):
     try:
-        path = hf_hub_download(
-            repo_id=target["repo_id"],
-            filename=target["filename"],
-            token=os.environ.get("HF_TOKEN"),
-            local_dir=scratch_download_dir,
-            local_dir_use_symlinks=False,
-            resume_download=True,
-        )
-        queue.put(("ok", path))
+        # Suporta tanto lista de partes ('filenames') quanto arquivo único ('filename')
+        filenames = target.get("filenames", [target.get("filename")])
+        primary_path = None
+
+        total_parts = len(filenames)
+        for idx, fname in enumerate(filenames, start=1):
+            if total_parts > 1:
+                print(f"📥 Baixando parte {idx}/{total_parts}: {fname}")
+
+            path = hf_hub_download(
+                repo_id=target["repo_id"],
+                filename=fname,
+                token=os.environ.get("HF_TOKEN"),
+                local_dir=scratch_download_dir,
+                local_dir_use_symlinks=False,
+                resume_download=True,
+            )
+            # Salva o caminho do primeiro arquivo (ex: part-00001) para passar ao llama-server
+            if idx == 1:
+                primary_path = path
+
+        queue.put(("ok", primary_path))
     except Exception as e:
         queue.put(("error", str(e)))
 
@@ -351,8 +364,14 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
 
 def run_llamacpp(local_model_path, identifier):
     kill_zombie_servers("58291")
-    """Inicia o servidor binário C++ nativo do Llama.cpp com validação em dois estágios (Health Check + Completion)."""
+    """Inicia o servidor binário C++ nativo do Llama.cpp com validação em dois estágios."""
     has_gpu = os.environ.get("HAS_GPU", "false").lower() == "true"
+
+    # Define dinamicamente o valor do offload sem duplicar flags no cmd
+    ngl_val = "999" if has_gpu else "0"
+    mode_str = "GPU (Full Offload)" if has_gpu else "CPU Nativo"
+
+    print(f"🚀 Subindo Llama-Server (C++) para: {identifier} [Modo: {mode_str}]")
 
     cmd = [
         "llama-server",
@@ -360,18 +379,11 @@ def run_llamacpp(local_model_path, identifier):
         "--port", "58291",
         "-c", "4096",
         "--alias", "vllmModel",
-        "-ngl", "99",
-        "-sm", "layer",  
+        "-ngl", ngl_val,
+        "-sm", "layer",
         "--context-shift",
         "-np", "1",
     ]
-
-    if has_gpu:
-        print(f"🚀 Subindo Llama-Server (C++) para: {identifier} [Modo: GPU (Full Offload)]")
-        cmd += ["-ngl", "999"]
-    else:
-        print(f"🚀 Subindo Llama-Server (C++) para: {identifier} [Modo: CPU Nativo]")
-        cmd += ["-ngl", "0"]
 
     # 📂 Gerenciamento Centralizado de Logs na Unity Artifacts
     logs_dir = "/app/artifacts/llamacpp_logs"
@@ -539,9 +551,18 @@ def main():
         # models_to_test = get_best_gguf_models(limit=70, short="likes",
         #                                       max_size=30.0, modelt_filter=["gguf"], days_old=3065,
         #                                       completed_models=completed_models, oder_size=False)
-        models_to_test = get_best_gguf_models(limit=100, model_search="code",
-                                              max_size=30.0, modelt_filter=["gguf"], days_old=3065,
-                                              completed_models=completed_models, oder_size=False)
+        # models_to_test = get_best_gguf_models(limit=100, model_search="code",
+        #                                       max_size=30.0, modelt_filter=["gguf"], days_old=3065,
+        #                                       completed_models=completed_models, oder_size=False)
+        model1 = get_best_gguf_models(limit=1, author="nerkyor",
+                                      model_search="Qwen3.8-27B-Coder390-EfficientThink-Opus5.5-GPT6Astra-Grok4.7-DSV4Pro-K3-SFT-RLOO-MTP-DFlash2",
+                                      max_size=50, modelt_filter=["gguf"],days_old=3065,completed_models=completed_models,)
+        model2 = get_best_gguf_models(limit=1, author="Qwen",model_search="Qwen3-Coder-Next-GGUF",
+                                      max_size=100, modelt_filter=["gguf"], days_old=3065,completed_models=completed_models, )
+        model3 = get_best_gguf_models(limit=1, author="unsloth", model_search="Qwen3.8-27B-GGUF",
+                                      max_size=50, modelt_filter=["gguf"], days_old=3065,
+                                      completed_models=completed_models, )
+        models_to_test = model1+model2+-model3
     else:
         models_to_test = get_best_gguf_models(limit=1, completed_models=completed_models,  max_size=1)
 
@@ -574,6 +595,13 @@ def main():
             TIMEOUT = 3600  # 1 hora
 
             local_path = None
+            model_identifier = target["identifier"]
+            is_split = target.get("is_split", False)
+            filenames = target.get("filenames", [target.get("filename")])
+
+            print(f"\n=======================================================")
+            split_info = f" ({len(filenames)} partes)" if is_split else ""
+            print(f"📥 [Llama.cpp] Preparando download de: {model_identifier}{split_info}")
 
             for tentativa in range(1, MAX_RETRIES + 1):
                 print(f"Tentativa {tentativa}/{MAX_RETRIES}")
@@ -588,13 +616,13 @@ def main():
                 p.join(TIMEOUT)
 
                 if p.is_alive():
-                    print("⚠️ Timeout. Matando processo...")
+                    print("⚠️ Timeout no download. Matando processo worker...")
                     p.terminate()
                     p.join()
                     continue
 
                 if queue.empty():
-                    print("⚠️ Processo terminou sem retornar resultado.")
+                    print("⚠️ Processo de download terminou sem retornar resultado.")
                     continue
 
                 status, result = queue.get()
@@ -603,14 +631,13 @@ def main():
                     local_path = result
                     break
 
-                print(result)
+                print(f"❌ Erro no download: {result}")
 
             if local_path is None:
-                print("❌ Não foi possível baixar o modelo.")
+                print("❌ Não foi possível baixar o modelo após todas as tentativas.")
                 continue
 
-            # Print de debug para você monitorar no log se ele está indo para o lugar certo
-            print(f"📍 Arquivo localizado em: {local_path}")
+            print(f"📍 Arquivo principal do modelo alocado em: {local_path}")
 
             engine_process = run_llamacpp(local_path, model_identifier)
 

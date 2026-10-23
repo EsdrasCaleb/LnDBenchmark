@@ -397,13 +397,14 @@ def run_vllm(model_name):
             process.terminate()
             return None
         time.sleep(5)
-    
+
 
 def get_best_gguf_models(limit=5, completed_models=None,
-                         intruct_only=False,days_old=365,
-                         modelt_filter=["gguf", "text-generation", "code","llama.cpp"],
+                         intruct_only=False, days_old=365,
+                         modelt_filter=["gguf", "text-generation", "code", "llama.cpp"],
                          model_search="", max_size=8.0,
-                         bigger_first=False,oder_size=True,author=None,short="trending_score"):
+                         bigger_first=False, oder_size=True, author=None, short="trending_score",
+                         exclude_fp16=True, allow_split=True):
     if completed_models is None:
         completed_models = set()
 
@@ -432,8 +433,15 @@ def get_best_gguf_models(limit=5, completed_models=None,
 
     filtered_models = []
 
-    for model in available_models:
+    # Regex para identificar padrões de FP16/F16
+    fp16_regex = re.compile(r'[-._/](f16|fp16|float16)([-._.]|$|\.gguf)', re.IGNORECASE)
 
+    # Regex para identificar fragmentos divididos (ex: -00001-of-00003, .part1, .split-01)
+    split_regex = re.compile(r'[-._](0*\d+-of-0*\d+|\d{5}-of-\d{5}|part-?\d+|split-?\d+)', re.IGNORECASE)
+
+    unwanted_keywords = ["mmproj", "mtp", "imatrix", "image", "ocr"]
+
+    for model in available_models:
         model_id_lower = model.modelId.lower()
 
         if "mtp" in model_id_lower:
@@ -446,64 +454,115 @@ def get_best_gguf_models(limit=5, completed_models=None,
             if last_modified < um_ano_atras:
                 continue
 
-        pipeline = getattr(model, 'pipeline_tag', '')
         tags = getattr(model, 'tags', [])
         tags_lower = [str(t).lower() for t in tags]
 
         eh_instruct_ou_it = (
-            "instruct" in model_id_lower or 
-            "-i" in model_id_lower or 
-            "instruct" in tags_lower or 
-            "it" in tags_lower
+                "instruct" in model_id_lower or
+                "-i" in model_id_lower or
+                "instruct" in tags_lower or
+                "it" in tags_lower
         )
-        
+
         if intruct_only and not eh_instruct_ou_it:
             continue
 
         try:
-            repo_files =  list(api.list_repo_tree(model.modelId, expand=True,recursive=True))
+            repo_files = list(api.list_repo_tree(model.modelId, expand=True, recursive=True))
         except Exception:
             continue
 
-        valid_gguf_files = []
-        
+        # Dicionário para agrupar arquivos por variante de quantização/modelo
+        gguf_groups = {}
+
         for item in repo_files:
-            if item.path.endswith(".gguf"):
-                security_info = getattr(item, 'security', None)
-                if security_info and security_info.safe is not True and security_info.status == "unsafe":
-                    print(f"⚠️ Modelo bloqueado por segurança: {model.modelId} ({item.path})")
-                    continue
+            if not item.path.lower().endswith(".gguf"):
+                continue
 
-                # Ignora fragmentos
-                if any(part in item.path.lower() for part in ["split", "-of-", "part", "mmproj",'mtp','imatrix',"image","ocr"]):
-                    continue
-                
-                size_bytes = getattr(item, 'size', 0) or 0
-                size_gb = size_bytes / (1024 ** 3)
+            item_path_lower = item.path.lower()
 
-                if 0 < size_gb <= max_size:
-                    valid_gguf_files.append({"filename": item.path, "size_gb": size_gb})
+            # Checagem de segurança
+            security_info = getattr(item, 'security', None)
+            if security_info and security_info.safe is not True and security_info.status == "unsafe":
+                print(f"⚠️ Modelo bloqueado por segurança: {model.modelId} ({item.path})")
+                continue
 
-        if not valid_gguf_files:
+            # Ignora arquivos multimídia e auxiliares incompatíveis
+            if any(kw in item_path_lower for kw in unwanted_keywords):
+                continue
+
+            # 1. FILTRO FP16 / F16
+            if exclude_fp16 and fp16_regex.search(item_path_lower):
+                continue
+
+            size_bytes = getattr(item, 'size', 0) or 0
+            size_gb = size_bytes / (1024 ** 3)
+
+            # 2. DETECÇÃO E AGRUPAMENTO DE MODELOS EM PARTES (SPLIT)
+            is_split = bool(split_regex.search(item.path))
+            if is_split and not allow_split:
+                continue
+
+            # Chave base unificada removendo o sufixo de fragmento
+            base_key = split_regex.sub('', item.path) if is_split else item.path
+
+            if base_key not in gguf_groups:
+                gguf_groups[base_key] = {
+                    "files": [],
+                    "is_split": is_split
+                }
+
+            gguf_groups[base_key]["files"].append({
+                "filename": item.path,
+                "size_gb": size_gb
+            })
+
+        # Avalia cada variante/grupo de arquivos
+        valid_variants = []
+        for base_key, group_data in gguf_groups.items():
+            # Ordena os arquivos do grupo (garante part-00001 antes de part-00002)
+            group_files = sorted(group_data["files"], key=lambda x: x["filename"])
+            total_size_gb = sum(f["size_gb"] for f in group_files)
+
+            # O limite de tamanho max_size é aplicado ao TAMANHO SOMADO de todas as partes
+            if 0 < total_size_gb <= max_size:
+                valid_variants.append({
+                    "filenames": [f["filename"] for f in group_files],
+                    "primary_filename": group_files[0]["filename"],
+                    "total_size_gb": total_size_gb,
+                    "is_split": group_data["is_split"]
+                })
+
+        if not valid_variants:
             continue
 
-        valid_gguf_files.sort(key=lambda x: x["size_gb"], reverse=True)
-        chosen_file = valid_gguf_files[0]
-        model_identifier = f"{model.modelId}/{chosen_file['filename']}"
+        # Pega a variante com maior tamanho total que respeita o max_size
+        valid_variants.sort(key=lambda x: x["total_size_gb"], reverse=True)
+        chosen_variant = valid_variants[0]
+
+        # O identificador usa a primeira parte como referência
+        model_identifier = f"{model.modelId}/{chosen_variant['primary_filename']}"
 
         if model_identifier in blacklist or model_identifier in completed_models:
             continue
 
         filtered_models.append({
             "repo_id": model.modelId,
-            "filename": chosen_file["filename"],
-            "size_gb": chosen_file["size_gb"],
+            "filename": chosen_variant["primary_filename"],  # Mantido para compatibilidade
+            "filenames": chosen_variant["filenames"],  # Lista com TODAS as partes a baixar
+            "size_gb": chosen_variant["total_size_gb"],
+            "is_split": chosen_variant["is_split"],
             "identifier": model_identifier
         })
-        print(f"✅ Especialista em Código Encontrado: {model_identifier} (~{chosen_file['size_gb']:.2f} GB)")
+
+        split_str = f" [Dividido em {len(chosen_variant['filenames'])} partes]" if chosen_variant['is_split'] else ""
+        print(
+            f"✅ Especialista em Código Encontrado: {model_identifier} (~{chosen_variant['total_size_gb']:.2f} GB){split_str}")
 
         if limit and len(filtered_models) >= limit:
             break
-    if(oder_size):
+
+    if oder_size:
         filtered_models.sort(key=lambda x: x["size_gb"], reverse=bigger_first)
+
     return filtered_models
