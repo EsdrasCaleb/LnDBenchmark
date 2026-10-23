@@ -554,15 +554,12 @@ def main():
         # models_to_test = get_best_gguf_models(limit=100, model_search="code",
         #                                       max_size=30.0, modelt_filter=["gguf"], days_old=3065,
         #                                       completed_models=completed_models, oder_size=False)
-        model1 = get_best_gguf_models(limit=1, author="nerkyor",
-                                      model_search="Qwen3.8-27B-Coder390-EfficientThink-Opus5.5-GPT6Astra-Grok4.7-DSV4Pro-K3-SFT-RLOO-MTP-DFlash2",
-                                      max_size=50, modelt_filter=["gguf"],days_old=3065,completed_models=completed_models,)
         model2 = get_best_gguf_models(limit=1, author="Qwen",model_search="Qwen3-Coder-Next-GGUF",
                                       max_size=100, modelt_filter=["gguf"], days_old=3065,completed_models=completed_models, )
         model3 = get_best_gguf_models(limit=1, author="unsloth", model_search="Qwen3.8-27B-GGUF",
                                       max_size=50, modelt_filter=["gguf"], days_old=3065,
                                       completed_models=completed_models, )
-        models_to_test = model1+model2+-model3
+        models_to_test = model2+-model3
     else:
         models_to_test = get_best_gguf_models(limit=1, completed_models=completed_models,  max_size=1)
 

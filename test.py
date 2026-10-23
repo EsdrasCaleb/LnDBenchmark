@@ -16,8 +16,18 @@ def main():
     try:
         # Se a sua função aceitar um limite (ex: limit=5), você pode passar aqui.
         # Caso contrário, só chama ela vazia mesmo.
-        modelos =get_best_gguf_models(limit=1, author="Qwen", model_search="Qwen2.5-Coder-7B-Instruct-GGUF", max_size=9.0,
-                                        modelt_filter=["gguf"],days_old=3065)
+        completed_models = []
+        model1 = get_best_gguf_models(limit=1, author="nerkyor",
+                                      model_search="Coder39",
+                                      max_size=50, modelt_filter=["gguf"], days_old=3065,
+                                      completed_models=completed_models, )
+        model2 = get_best_gguf_models(limit=1, author="Qwen", model_search="Qwen3-Coder-Next-GGUF",
+                                      max_size=100, modelt_filter=["gguf"], days_old=3065,
+                                      completed_models=completed_models, )
+        model3 = get_best_gguf_models(limit=1, author="unsloth", model_search="Qwen3.8-27B-GGUF",
+                                      max_size=50, modelt_filter=["gguf"], days_old=3065,
+                                      completed_models=completed_models, )
+        modelos = model1 + model2 + -model3
         # modelos = modelos+get_best_gguf_models(limit=50,model_search="Janus",author="unsloth",modelt_filter="gguf",max_size=11,short="lastModified")  
         # modelos = modelos+get_best_gguf_models(limit=50,model_search="Qwen3.5",author="unsloth",modelt_filter="gguf",max_size=11,short="lastModified")         
         # modelos =modelos+get_best_gguf_models(limit=50,model_search="Qwen3.5",author="bartowski",modelt_filter="gguf",max_size=11,short="lastModified")         

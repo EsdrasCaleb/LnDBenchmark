@@ -2,6 +2,7 @@ import os
 import csv
 import time
 import shutil
+import re
 import threading
 import xml.etree.ElementTree as ET
 import psutil
