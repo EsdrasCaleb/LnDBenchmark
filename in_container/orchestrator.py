@@ -559,7 +559,7 @@ def main():
         model3 = get_best_gguf_models(limit=1, author="unsloth", model_search="Qwen3.8-27B-GGUF",
                                       max_size=50, modelt_filter=["gguf"], days_old=3065,
                                       completed_models=completed_models, )
-        models_to_test = model2+-model3
+        models_to_test = model2+model3
     else:
         models_to_test = get_best_gguf_models(limit=1, completed_models=completed_models,  max_size=1)
 
