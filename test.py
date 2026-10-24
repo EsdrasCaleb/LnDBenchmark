@@ -20,7 +20,7 @@ def main():
         model2 = get_best_gguf_models(limit=1, author="Qwen", model_search="Qwen3-Coder-Next-GGUF",
                                       max_size=100, modelt_filter=["gguf"], days_old=3065,
                                       completed_models=completed_models, )
-        model3 = get_best_gguf_models(limit=1, author="unsloth", model_search="Qwen3.8-27B-GGUF",
+        model3 = get_best_gguf_models(limit=10, model_search="Qwen3.8-27B-GGUF",
                                       max_size=50, modelt_filter=["gguf"], days_old=3065,
                                       completed_models=completed_models, )
         modelos =  model2 + -model3
