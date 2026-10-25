@@ -556,7 +556,7 @@ def main():
                                       completed_models=completed_models, )+
                           get_best_gguf_models(limit=100, model_search="code",
                                               max_size=100.0, modelt_filter=["gguf"], days_old=3065,
-                                              completed_models=completed_models, oder_size=False))
+                                              completed_models=completed_models, oder_size=False,exclude_fp16=False))
 
     else:
         models_to_test = get_best_gguf_models(limit=1, completed_models=completed_models,  max_size=1)
