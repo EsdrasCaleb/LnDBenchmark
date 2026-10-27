@@ -6,10 +6,9 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --gres=gpu:1
-#SBATCH --time=00:15:00               # 15 minutos é mais que suficiente para devolver a licença
+#SBATCH --time=00:15:00
 #SBATCH --mem=8G
-#SBATCH --partition=gpu-4-h200,gpu-8-h100,gpu-4-a100,gpu-8-v100  # Roda na mesma partição disponível
-
+#SBATCH --partition=gpu-4-h200,gpu-8-h100,gpu-4-a100,gpu-8-v100
 
 # 📍 FORÇA O DIRETÓRIO DE TRABALHO PARA O LOCAL DE SUBMISSÃO
 if [ -n "$SLURM_SUBMIT_DIR" ]; then
@@ -17,22 +16,16 @@ if [ -n "$SLURM_SUBMIT_DIR" ]; then
 fi
 
 # 1. CARREGAMENTO INTELIGENTE DO .ENV
-# Lemos linha por linha para evitar quebras por causa de espaços ou aspas
 if [ -f ".env" ]; then
     echo "📋 Carregando e exportando variáveis do .env para o Singularity..."
     while IFS= read -r line || [ -n "$line" ]; do
-        # Ignora linhas vazias e comentários
         [[ "$line" =~ ^[[:space:]]*# ]] && continue
         [[ -z "${line//[:space:]/}" ]] && continue
 
-        # Limpa espaços ao redor do '=' e remove aspas extras do valor
         key=$(echo "$line" | cut -d= -f1 | xargs)
         val=$(echo "$line" | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
 
-        # Exporta localmente para o Slurm usar (ex: PROJECT_PATH)
         export "$key"="$val"
-
-        # A MÁGICA: Exporta com o prefixo que o Singularity injeta AUTOMATICAMENTE no container
         export "SINGULARITYENV_$key"="$val"
     done < ".env"
 else
@@ -40,15 +33,16 @@ else
     exit 1
 fi
 
-# 📁 Carregue suas variáveis de ambiente/caminhos aqui (ou faça um source no seu env.sh)
-# source /app/projeto/definicoes_ambiente.sh
 ARTIFACTS_DIR="unity_artifacts"
 SCRATCH_DIR="../scratch"
-PIPELINE_SCRIPT="run_benchmark.sbatch"  # Nome do seu script principal
+
+# 🎯 RECEBE O NOME DO SCRIPT VIA ARGUMENTO $1 (COM FALLBACK SE NÃO FOR PASSADO)
+PIPELINE_SCRIPT="${1:-run_benchmark.sbatch}"
 
 echo "🔓 [CLEANUP] Iniciando processo de devolução de licença Unity..."
+echo "📌 Script agendado para a próxima iteração: $PIPELINE_SCRIPT"
 
-# Executa o comando que você definiu para liberar a licença na nuvem da Unity
+# Executa o comando para liberar a licença na nuvem da Unity
 singularity exec --nv --writable-tmpfs \
   --bind "$ARTIFACTS_DIR":/app/artifacts \
   "$HOME/unity-vllm-bench.sif" \
@@ -61,7 +55,6 @@ singularity exec --nv --writable-tmpfs \
 echo "✅ [CLEANUP] Comando de devolução executado. Verificando logs..."
 
 # 🎯 PASSO 2: INSPEÇÃO E AVALIAÇÃO DA FLAG
-
 FLAG_FILE="$ARTIFACTS_DIR/NO_MORE_MODELS.flag"
 
 if [ -f "$FLAG_FILE" ]; then
@@ -70,9 +63,13 @@ if [ -f "$FLAG_FILE" ]; then
     exit 0
 else
     echo "🔄 [CONTINUAR] A flag de fim não foi encontrada. Ainda há modelos na fila!"
-    echo "🚀 Agendando uma nova instância do pipeline na melhor partição livre..."
+    echo "🚀 Re-submetendo o script '$PIPELINE_SCRIPT' na fila do Slurm..."
 
-    # Re-submete o pipeline principal. O Slurm vai analisar a lista de partições
-    # e colocar o job para rodar onde houver GPU vaga primeiro.
-    sbatch "$PIPELINE_SCRIPT"
+    # Garante que o arquivo do script existe antes de submeter
+    if [ -f "$PIPELINE_SCRIPT" ]; then
+        sbatch "$PIPELINE_SCRIPT"
+    else
+        echo "❌ [ERRO] O script de pipeline '$PIPELINE_SCRIPT' não foi encontrado no diretório!"
+        exit 1
+    fi
 fi
