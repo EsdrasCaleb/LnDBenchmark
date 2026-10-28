@@ -554,20 +554,10 @@ def main():
         #models_to_test = get_best_gguf_models(limit=10, model_search="code",
         #                                      max_size=100.0, modelt_filter=["gguf"], days_old=3065,
         #                                      completed_models=completed_models, oder_size=False,exclude_fp16=False)
-        model2 = get_best_gguf_models(limit=1, author="IsValorum",
-                                      model_search="Qwen3.8-35B-A3B-Distill-MTP-APEX-I-MiniPlus-V2.1-GGUF",
+
+        models_to_test = get_best_gguf_models(limit=10, author="IsValorum", model_search="code",
                                       max_size=100, modelt_filter=["gguf"], days_old=3065,
                                       completed_models=completed_models, )
-        model3 = get_best_gguf_models(limit=10, author="IsValorum",
-                                      model_search="Qwen3.8-Flash-Coder-APEX-I-MiniPlus-V2.1-GGUF",
-                                      max_size=50, modelt_filter=["gguf"], days_old=3065,
-                                      completed_models=completed_models, )
-        model4 = get_best_gguf_models(limit=10, author="IsValorum",
-                                      model_search="Tiel-Coder-35B-A3B-APEX-I-NanoPlus-GGUF",
-                                      max_size=50, modelt_filter=["gguf"], days_old=3065,
-                                      completed_models=completed_models, )
-
-        models_to_test = model2 + model3 + model4
     else:
         models_to_test = get_best_gguf_models(limit=1, completed_models=completed_models,  max_size=1)
 
