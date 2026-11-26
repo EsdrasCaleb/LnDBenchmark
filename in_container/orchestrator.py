@@ -211,7 +211,7 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
     #     "-disable-assembly-updater",
     #     "-logFile", f"{model_dir}/generation-cli-log.txt"
     # ]
-    cmd_args = [
+    cmd = [
         "llama-server",
         "-m", local_model_path,
         "--port", "58291",
@@ -224,7 +224,6 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
         "-np", "1",
         "--jinja",
         "--no-context-shift",
-        "--spec-type", "draft-mtp",
         "--temp", "0.7",
         "--top-p", "0.9",
         "--top-k", "30",
