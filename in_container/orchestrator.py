@@ -203,13 +203,34 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
     monitor.start()
 
     # 1. Extrai os argumentos para uma variável estruturada
+    # cmd_args = [
+    #     "/opt/Unity/Unity", "-projectPath", project_path, "-batchmode", "-nographics",
+    #     "-executeMethod", "LaundryNDishes.CLI.LndCommandLineInterface.GenerateTestsFolder",
+    #     "-folder", script_path, "-csv", f"{model_dir}/testGeneration.csv",
+    #     "-no-licensing",
+    #     "-disable-assembly-updater",
+    #     "-logFile", f"{model_dir}/generation-cli-log.txt"
+    # ]
     cmd_args = [
-        "/opt/Unity/Unity", "-projectPath", project_path, "-batchmode", "-nographics",
-        "-executeMethod", "LaundryNDishes.CLI.LndCommandLineInterface.GenerateTestsFolder",
-        "-folder", script_path, "-csv", f"{model_dir}/testGeneration.csv",
-        "-no-licensing",
-        "-disable-assembly-updater",
-        "-logFile", f"{model_dir}/generation-cli-log.txt"
+        "llama-server",
+        "-m", local_model_path,
+        "--port", "58291",
+        "--alias", "vllmModel",
+        "-c", "32768",
+        "-n", "16384",
+        "-ngl", str(ngl_val),
+        "-fa", "on",
+        "-sm", "layer",
+        "-np", "1",
+        "--jinja",
+        "--no-context-shift",
+        "--spec-type", "draft-mtp",
+        "--temp", "0.7",
+        "--top-p", "0.9",
+        "--top-k", "30",
+        "--min-p", "0.02",
+        "--repeat-penalty", "1.05",
+        "--chat-template-kwargs", '{"reasoning_effort": "medium"}',
     ]
 
     try:
@@ -558,11 +579,9 @@ def main():
         # models_to_test = get_best_gguf_models(limit=10, author="IsValorum", model_search="code",
         #                               max_size=100, modelt_filter=["gguf"], days_old=3065,
         #                               completed_models=completed_models, )
-        # models_to_test = get_best_gguf_models(limit=10, author="unsloth", model_search="Qwen3.8-27B-GGUF",
-        #                                       max_size=40, modelt_filter=["gguf"], days_old=3065,
-        #                                       completed_models=completed_models, )
-        models_to_test = get_best_gguf_models(limit=10, author="Qwen", model_search="Qwen3-Next-80B-A3B-Instruct-GGUF",
-                                              max_size=100, modelt_filter=["gguf"], days_old=3065,
+
+        models_to_test = get_best_gguf_models(limit=10, author="DavidAU", model_search="Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF",
+                                              max_size=40, modelt_filter=["gguf"], days_old=3065,
                                               completed_models=completed_models, )
     else:
         models_to_test = get_best_gguf_models(limit=1, completed_models=completed_models,  max_size=1)
