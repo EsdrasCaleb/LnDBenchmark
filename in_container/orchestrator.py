@@ -377,18 +377,12 @@ def run_llamacpp(local_model_path, identifier):
         "llama-server",
         "-m", local_model_path,
         "--port", "58291",
+        "-c", "4096",
         "--alias", "vllmModel",
-        "-c", "32768",
-        "-ngl", str(ngl_val),
+        "-ngl", ngl_val,
         "-sm", "layer",
+        "--context-shift",
         "-np", "1",
-        "--jinja",
-        "--temp", "1.0",
-        "--top-p", "0.95",
-        "--top-k", "20",
-        "--min-p", "0.0",
-        "--presence-penalty", "1.5",
-        "--chat-template-kwargs", '{"reasoning_effort": "medium"}',
     ]
 
     # 📂 Gerenciamento Centralizado de Logs na Unity Artifacts
@@ -564,8 +558,11 @@ def main():
         # models_to_test = get_best_gguf_models(limit=10, author="IsValorum", model_search="code",
         #                               max_size=100, modelt_filter=["gguf"], days_old=3065,
         #                               completed_models=completed_models, )
-        models_to_test = get_best_gguf_models(limit=10, author="unsloth", model_search="Qwen3.8-27B-GGUF",
-                                              max_size=40, modelt_filter=["gguf"], days_old=3065,
+        # models_to_test = get_best_gguf_models(limit=10, author="unsloth", model_search="Qwen3.8-27B-GGUF",
+        #                                       max_size=40, modelt_filter=["gguf"], days_old=3065,
+        #                                       completed_models=completed_models, )
+        models_to_test = get_best_gguf_models(limit=10, author="Qwen", model_search="Qwen3-Next-80B-A3B-Instruct-GGUF",
+                                              max_size=100, modelt_filter=["gguf"], days_old=3065,
                                               completed_models=completed_models, )
     else:
         models_to_test = get_best_gguf_models(limit=1, completed_models=completed_models,  max_size=1)
