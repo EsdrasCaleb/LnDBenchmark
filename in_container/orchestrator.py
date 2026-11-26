@@ -580,7 +580,7 @@ def main():
         #                               max_size=100, modelt_filter=["gguf"], days_old=3065,
         #                               completed_models=completed_models, )
 
-        models_to_test = get_best_gguf_models(limit=10, author="DavidAU", model_search="Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF",
+        models_to_test = get_best_gguf_models(limit=10, author="DavidAU", model_search="Qwen3.8-27B-TURBO",
                                               max_size=40, modelt_filter=["gguf"], days_old=3065,
                                               completed_models=completed_models, )
     else:
