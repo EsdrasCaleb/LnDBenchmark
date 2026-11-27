@@ -203,33 +203,13 @@ def run_unity_pipeline(model_safe_name, model_dir, backend_name):
     monitor.start()
 
     # 1. Extrai os argumentos para uma variável estruturada
-    # cmd_args = [
-    #     "/opt/Unity/Unity", "-projectPath", project_path, "-batchmode", "-nographics",
-    #     "-executeMethod", "LaundryNDishes.CLI.LndCommandLineInterface.GenerateTestsFolder",
-    #     "-folder", script_path, "-csv", f"{model_dir}/testGeneration.csv",
-    #     "-no-licensing",
-    #     "-disable-assembly-updater",
-    #     "-logFile", f"{model_dir}/generation-cli-log.txt"
-    # ]
-    cmd = [
-        "llama-server",
-        "-m", local_model_path,
-        "--port", "58291",
-        "--alias", "vllmModel",
-        "-c", "32768",
-        "-n", "16384",
-        "-ngl", str(ngl_val),
-        "-fa", "on",
-        "-sm", "layer",
-        "-np", "1",
-        "--jinja",
-        "--no-context-shift",
-        "--temp", "0.7",
-        "--top-p", "0.9",
-        "--top-k", "30",
-        "--min-p", "0.02",
-        "--repeat-penalty", "1.05",
-        "--chat-template-kwargs", '{"reasoning_effort": "medium"}',
+    cmd_args = [
+         "/opt/Unity/Unity", "-projectPath", project_path, "-batchmode", "-nographics",
+         "-executeMethod", "LaundryNDishes.CLI.LndCommandLineInterface.GenerateTestsFolder",
+         "-folder", script_path, "-csv", f"{model_dir}/testGeneration.csv",
+         "-no-licensing",
+         "-disable-assembly-updater",
+         "-logFile", f"{model_dir}/generation-cli-log.txt"
     ]
 
     try:
@@ -403,6 +383,27 @@ def run_llamacpp(local_model_path, identifier):
         "-sm", "layer",
         "--context-shift",
         "-np", "1",
+    ]
+
+    cmd = [
+        "llama-server",
+        "-m", local_model_path,
+        "--port", "58291",
+        "--alias", "vllmModel",
+        "-c", "32768",
+        "-n", "16384",
+        "-ngl", str(ngl_val),
+        "-fa", "on",
+        "-sm", "layer",
+        "-np", "1",
+        "--jinja",
+        "--no-context-shift",
+        "--temp", "0.7",
+        "--top-p", "0.9",
+        "--top-k", "30",
+        "--min-p", "0.02",
+        "--repeat-penalty", "1.05",
+        "--chat-template-kwargs", '{"reasoning_effort": "medium"}',
     ]
 
     # 📂 Gerenciamento Centralizado de Logs na Unity Artifacts
